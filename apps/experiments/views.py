@@ -1,4 +1,4 @@
-from django.db.models import Avg, Count, F, Q
+from django.db.models import Avg, Count, F
 from django.db.models.functions import TruncDate
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import viewsets
