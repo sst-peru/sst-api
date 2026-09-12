@@ -36,7 +36,9 @@ class MeetingSerializer(serializers.ModelSerializer):
             "agenda", "minutes", "attendees", "attendee_count", "quorum_reached",
             "agreements", "created_at",
         )
-        read_only_fields = ("created_at",)
+        # number y committee los pone el servidor: el consecutivo del acta no se negocia
+        # con el cliente, y el comité sale de la empresa del usuario autenticado.
+        read_only_fields = ("created_at", "number", "committee")
 
 
 class CommitteeSerializer(serializers.ModelSerializer):
