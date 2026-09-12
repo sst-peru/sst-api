@@ -30,6 +30,8 @@ INSTALLED_APPS = [
     "apps.epp",
     "apps.inspections",
     "apps.experiments",
+    "apps.committee",
+    "apps.exports",
 ]
 
 MIDDLEWARE = [
