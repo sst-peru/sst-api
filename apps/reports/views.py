@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db.models import Avg, Count, F, Q
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -134,7 +136,7 @@ class MttrView(APIView):
 
     def get(self, request):
         days = int(request.query_params.get("days", 90))
-        since = timezone.now() - timezone.timedelta(days=days)
+        since = timezone.now() - timedelta(days=days)
         closed = Report.objects.filter(
             company=request.user.company_id,
             closed_at__isnull=False,

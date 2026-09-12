@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db.models import Count, F, Q
 from django.utils import timezone
 from rest_framework import viewsets
@@ -56,7 +58,7 @@ class InspectionComplianceView(APIView):
 
     def get(self, request):
         days = int(request.query_params.get("days", 90))
-        since = timezone.localdate() - timezone.timedelta(days=days)
+        since = timezone.localdate() - timedelta(days=days)
         qs = Inspection.objects.filter(
             schedule__company=request.user.company_id, due_date__gte=since
         )
