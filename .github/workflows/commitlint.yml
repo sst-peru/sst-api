@@ -1,0 +1,30 @@
+name: Conventional Commits
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validar mensajes de commit del PR
+        run: |
+          pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9@/_-]+\))?!?: .{1,100}$'
+          fallos=0
+          while read -r sha; do
+            msg=$(git log -1 --format=%s "$sha")
+            if [[ "$msg" =~ ^Merge ]]; then continue; fi
+            if ! [[ "$msg" =~ $pattern ]]; then
+              echo "::error::Commit $sha no cumple Conventional Commits: $msg"
+              fallos=1
+            fi
+          done < <(git log --format=%H origin/${{ github.base_ref }}..HEAD)
+          if [ "$fallos" -eq 1 ]; then
+            echo "Formato esperado: tipo(alcance): descripción  — ej. feat(auth): agregar login con JWT"
+            exit 1
+          fi
+          echo "Todos los commits cumplen Conventional Commits."
