@@ -20,6 +20,17 @@ from .serializers import (
 )
 
 
+def _clear_prefetch_cache(report: Report) -> None:
+    """Invalida el cache de prefetch para que la bitacora recien creada salga en la respuesta.
+
+    get_queryset() trae los reportes con prefetch_related("actions"), asi que `report.actions`
+    queda congelado en lo que habia ANTES de crear la nueva accion. DRF hace exactamente esto
+    en ModelViewSet.update() por el mismo motivo.
+    """
+    if hasattr(report, "_prefetched_objects_cache"):
+        report._prefetched_objects_cache = {}
+
+
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
 
@@ -91,6 +102,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             note=serializer.validated_data.get("note", "") or "Responsable asignado.",
             new_status=report.status,
         )
+        _clear_prefetch_cache(report)
         return Response(ReportSerializer(report).data)
 
     @extend_schema(request=ReportCloseSerializer, responses=ReportSerializer)
@@ -105,6 +117,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         ReportAction.objects.create(
             report=report, author=request.user, note=note, new_status=ReportStatus.CERRADO
         )
+        _clear_prefetch_cache(report)
         return Response(ReportSerializer(report).data)
 
     @extend_schema(request=ReportStatusSerializer, responses=ReportSerializer)
@@ -124,6 +137,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             note=serializer.validated_data.get("note", ""),
             new_status=new_status,
         )
+        _clear_prefetch_cache(report)
         return Response(ReportSerializer(report).data)
 
 

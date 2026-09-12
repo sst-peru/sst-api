@@ -1,0 +1,23 @@
+# Normaliza finales de linea: en el repo siempre LF, sin importar el sistema operativo.
+# Sin esto, al trabajar en Windows cada archivo nuevo entra con CRLF y genera diffs falsos.
+* text=auto eol=lf
+
+# Scripts de Windows: estos SI deben quedar con CRLF.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Scripts de shell y hooks de git: deben quedar con LF o bash falla con "\r: command not found".
+*.sh          text eol=lf
+.githooks/*   text eol=lf
+
+# Binarios: git no los toca.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.jar  binary
+*.keystore binary
+*.apk  binary
