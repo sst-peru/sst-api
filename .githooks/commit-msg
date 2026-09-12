@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Valida Conventional Commits. Instalar con: bash scripts/setup-hooks.sh
+# Formato: tipo(alcance opcional): descripción
+# Ej: feat(auth): agregar login con JWT
+mensaje=$(head -n1 "$1")
+
+# Los merges y reverts automáticos de git no se validan.
+if [[ "$mensaje" =~ ^(Merge|Revert) ]]; then
+  exit 0
+fi
+
+patron='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9@/_-]+\))?!?: .{1,100}$'
+
+if [[ ! "$mensaje" =~ $patron ]]; then
+  cat <<'MSG' >&2
+
+  ✖ El mensaje de commit no cumple Conventional Commits.
+
+  Formato:  tipo(alcance): descripción en minúscula, modo imperativo
+
+  Tipos válidos:
+    feat      nueva funcionalidad           fix       corrección de bug
+    docs      documentación                 style     formato, sin cambio de lógica
+    refactor  reestructuración              perf      rendimiento
+    test      pruebas                       build     dependencias o build
+    ci        integración continua          chore     tareas varias
+    revert    revertir un commit
+
+  Ejemplos buenos:
+    feat(auth): agregar login con JWT
+    feat(reports): permitir sincronizar reportes creados offline
+    fix(iperc): corregir cálculo del nivel de riesgo
+    docs(readme): documentar variables de entorno
+
+  Ejemplos malos:
+    "cambios"            (sin tipo)
+    "Feat: Login"        (tipo en mayúscula y descripción capitalizada)
+    "arreglé el bug"     (sin tipo)
+
+MSG
+  echo "  Tu mensaje fue: $mensaje" >&2
+  echo "" >&2
+  exit 1
+fi
