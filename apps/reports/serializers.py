@@ -1,6 +1,28 @@
+from decimal import Decimal, InvalidOperation
+
 from rest_framework import serializers
 
 from .models import Category, Report, ReportAction, ReportStatus
+
+
+class CoordenadaField(serializers.DecimalField):
+    """Campo de latitud o longitud tolerante con la precisión que manda el GPS.
+
+    El GPS del navegador y el del celular devuelven cosas como -12.046374158283195:
+    muchos más dígitos de los que el modelo acepta (9 en total, 6 decimales), y el
+    API respondía "Asegúrese de que no haya más de 9 dígitos en total". Redondeamos
+    aquí en vez de exigirle al cliente que lo haga, porque son tres clientes y el
+    error se repetiría en cada uno. Seis decimales son unos 11 cm: más precisión que
+    eso no significa nada para ubicar un andamio.
+    """
+
+    def to_internal_value(self, data):
+        if data not in (None, ""):
+            try:
+                data = Decimal(str(data)).quantize(Decimal("0.000001"))
+            except (InvalidOperation, ValueError, TypeError):
+                pass
+        return super().to_internal_value(data)
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -44,6 +66,13 @@ class ReportSerializer(serializers.ModelSerializer):
 
 class ReportCreateSerializer(serializers.ModelSerializer):
     """Entrada mínima: es lo único que el flujo rápido de 3-4 taps necesita mandar."""
+
+    latitude = CoordenadaField(
+        max_digits=9, decimal_places=6, required=False, allow_null=True
+    )
+    longitude = CoordenadaField(
+        max_digits=9, decimal_places=6, required=False, allow_null=True
+    )
 
     class Meta:
         model = Report
