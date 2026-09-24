@@ -2,6 +2,12 @@
 # Valida Conventional Commits. Instalar con: bash scripts/setup-hooks.sh
 # Formato: tipo(alcance opcional): descripción
 # Ej: feat(auth): agregar login con JWT
+# --- Sin coautoria de IA: estos pies se eliminan antes de validar el mensaje ---
+__limpio="$1.sin-ia"
+grep -viE '^[[:space:]]*(co-authored-by:.*(claude|anthropic)|claude-session:|.*generated with \[claude code\])' "$1" > "$__limpio" || true
+awk '{l[NR]=$0} END{u=NR; while(u>0 && l[u] ~ /^[[:space:]]*$/) u--; for(i=1;i<=u;i++) print l[i]}' "$__limpio" > "$1"
+rm -f "$__limpio"
+# --- fin del bloque ---
 mensaje=$(head -n1 "$1")
 
 # Los merges y reverts automáticos de git no se validan.
