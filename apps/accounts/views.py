@@ -175,7 +175,11 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if not self.request.user.can_manage:
             raise PermissionDenied("Solo supervisor o comité de SST puede ver los usuarios.")
-        return User.objects.filter(company=self.request.user.company_id).select_related("area")
+        return (
+            User.objects.filter(company=self.request.user.company_id)
+            .select_related("area")
+            .order_by("first_name", "last_name", "id")
+        )
 
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company)

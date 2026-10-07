@@ -39,7 +39,7 @@ class SoloAdminEscribe(permissions.BasePermission):
 
 @extend_schema(tags=["Experimento A/B"])
 class ExperimentViewSet(viewsets.ModelViewSet):
-    queryset = Experiment.objects.all()
+    queryset = Experiment.objects.all().order_by("key")
     serializer_class = ExperimentSerializer
     lookup_field = "key"
     permission_classes = (SoloAdminEscribe,)
