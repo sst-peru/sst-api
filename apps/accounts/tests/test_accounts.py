@@ -159,3 +159,71 @@ def test_manager_puede_crear_un_supervisor(supervisor, area):
     )
     assert response.status_code == 201
     assert User.objects.get(username="nuevo_sup").role == Role.SUPERVISOR
+
+
+EMPRESA_NUEVA = {
+    "name": "Constructora del Sur SAC",
+    "ruc": "20600000001",
+    "address": "Av. Industrial 455, Lima",
+    "worker_count": 32,
+    "username": "duena",
+    "first_name": "Carmen",
+    "last_name": "Rojas",
+    "password": "ClaveSegura123",
+    "password_confirm": "ClaveSegura123",
+}
+
+
+def test_registro_de_empresa_crea_la_empresa_y_su_administrador(db):
+    response = APIClient().post(reverse("register-company"), EMPRESA_NUEVA, format="json")
+
+    assert response.status_code == 201
+    empresa = Company.objects.get(ruc="20600000001")
+    assert empresa.name == "Constructora del Sur SAC"
+    # Con 32 trabajadores la ley exige comité, no supervisor.
+    assert empresa.requires_committee is True
+
+    admin = User.objects.get(username="duena")
+    assert admin.company_id == empresa.id
+    assert admin.role == Role.ADMIN
+    assert admin.check_password("ClaveSegura123")
+    assert response.data["company"]["ruc"] == "20600000001"
+    assert response.data["user"]["role"] == Role.ADMIN
+
+
+def test_registro_de_empresa_rechaza_un_ruc_ya_registrado(company):
+    datos = EMPRESA_NUEVA | {"ruc": company.ruc}
+    response = APIClient().post(reverse("register-company"), datos, format="json")
+
+    assert response.status_code == 400
+    assert "ruc" in response.data
+    # No se creó un usuario huérfano al rechazar la empresa.
+    assert not User.objects.filter(username="duena").exists()
+
+
+def test_registro_de_empresa_rechaza_un_ruc_que_no_sea_de_once_digitos(db):
+    response = APIClient().post(
+        reverse("register-company"), EMPRESA_NUEVA | {"ruc": "2060ABC"}, format="json"
+    )
+    assert response.status_code == 400
+    assert "ruc" in response.data
+
+
+def test_registro_de_empresa_rechaza_un_usuario_ya_tomado(company, operario):
+    datos = EMPRESA_NUEVA | {"username": operario.username}
+    response = APIClient().post(reverse("register-company"), datos, format="json")
+
+    assert response.status_code == 400
+    assert "username" in response.data
+    # La transacción revirtió la empresa: su RUC sigue libre para reintentar.
+    assert not Company.objects.filter(ruc="20600000001").exists()
+
+
+def test_el_administrador_recien_registrado_puede_iniciar_sesion(db):
+    APIClient().post(reverse("register-company"), EMPRESA_NUEVA, format="json")
+
+    response = APIClient().post(
+        reverse("login"), {"username": "duena", "password": "ClaveSegura123"}, format="json"
+    )
+    assert response.status_code == 200
+    assert response.data["user"]["role"] == Role.ADMIN
