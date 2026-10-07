@@ -5,7 +5,7 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import APIException, PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -18,6 +18,48 @@ from .serializers import (
     ReportSerializer,
     ReportStatusSerializer,
 )
+
+
+class SyncConflict(APIException):
+    """409 con la version del servidor para que el cliente offline pueda resolver.
+
+    El movil trabaja sin conexion y sincroniza despues. La creacion ya es idempotente por
+    client_uuid, pero una modificacion es otra cosa: si el supervisor cerro el hallazgo
+    mientras el celular estaba sin senal, aplicar el cambio del celular sin avisar
+    borraria el cierre en silencio. Aqui se rechaza y se devuelve el estado actual, que es
+    lo unico que permite al cliente decidir con informacion.
+    """
+
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "sync_conflict"
+
+
+def _comprobar_conflicto(request, report: Report) -> None:
+    """Concurrencia optimista por marca de tiempo.
+
+    El cliente manda en base_updated_at el updated_at que tenia cuando empezo a editar. Si
+    no coincide con el del servidor, alguien mas toco el reporte en el medio. Es opcional:
+    quien no lo manda obtiene el comportamiento de siempre, ultimo en escribir gana.
+    """
+    base = request.data.get("base_updated_at")
+    if not base:
+        return
+    actual = report.updated_at.isoformat()
+    base_normalizada = str(base).replace("Z", "+00:00")
+    if base_normalizada == actual or base_normalizada == actual.replace("+00:00", "Z"):
+        return
+    raise SyncConflict(
+        {
+            "detail": (
+                "El reporte cambió en el servidor después de que tu copia se sincronizó. "
+                "Revisa la versión del servidor antes de volver a aplicar tu cambio."
+            ),
+            "code": "sync_conflict",
+            "your_base_updated_at": base,
+            "server_updated_at": actual,
+            "server_version": ReportSerializer(report, context={"request": request}).data,
+        }
+    )
 
 
 def _clear_prefetch_cache(report: Report) -> None:
@@ -74,7 +116,14 @@ class ReportViewSet(viewsets.ModelViewSet):
         if client_uuid:
             existing = Report.objects.filter(client_uuid=client_uuid).first()
             if existing is not None:
-                return Response(ReportSerializer(existing, context={"request": request}).data, status=status.HTTP_200_OK)
+                # No es un error: el cliente reintento una sincronizacion. La cabecera se
+                # lo dice para que no cuente el reporte dos veces en su cola local.
+                respuesta = Response(
+                    ReportSerializer(existing, context={"request": request}).data,
+                    status=status.HTTP_200_OK,
+                )
+                respuesta["X-Idempotent-Replay"] = "true"
+                return respuesta
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         extra = {}
@@ -88,6 +137,14 @@ class ReportViewSet(viewsets.ModelViewSet):
         )
         return Response(ReportSerializer(report, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
+    def update(self, request, *args, **kwargs):
+        _comprobar_conflicto(request, self.get_object())
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        _comprobar_conflicto(request, self.get_object())
+        return super().partial_update(request, *args, **kwargs)
+
     def _require_manager(self):
         if not self.request.user.can_manage:
             raise PermissionDenied("Solo supervisor o comité de SST puede hacer esto.")
@@ -97,6 +154,7 @@ class ReportViewSet(viewsets.ModelViewSet):
     def assign(self, request, pk=None):
         self._require_manager()
         report = self.get_object()
+        _comprobar_conflicto(request, report)
         serializer = ReportAssignSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         report.assigned_to_id = serializer.validated_data["assigned_to"]
@@ -118,6 +176,7 @@ class ReportViewSet(viewsets.ModelViewSet):
     def close(self, request, pk=None):
         self._require_manager()
         report = self.get_object()
+        _comprobar_conflicto(request, report)
         serializer = ReportCloseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         note = serializer.validated_data["closure_note"]
@@ -133,6 +192,7 @@ class ReportViewSet(viewsets.ModelViewSet):
     def change_status(self, request, pk=None):
         self._require_manager()
         report = self.get_object()
+        _comprobar_conflicto(request, report)
         serializer = ReportStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         new_status = serializer.validated_data["status"]

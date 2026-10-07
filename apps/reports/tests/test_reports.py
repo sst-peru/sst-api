@@ -242,3 +242,96 @@ def test_el_reporte_no_necesita_ubicacion_para_crearse(operario, area):
 
     assert creado.status_code == 201
     assert creado.data["latitude"] is None
+# --- Conflictos de sincronización (TS31) ---
+
+
+def test_un_reintento_idempotente_se_anuncia_en_la_cabecera(operario, area):
+    """Así el cliente sabe que no creó nada y puede sacar el reporte de su cola local."""
+    identificador = str(uuid.uuid4())
+    datos = {"kind": "CONDICION", "area": area.id, "client_uuid": identificador}
+
+    primera = auth_client(operario).post(reverse("report-list"), datos, format="json")
+    segunda = auth_client(operario).post(reverse("report-list"), datos, format="json")
+
+    assert primera.status_code == 201
+    assert "X-Idempotent-Replay" not in primera
+    assert segunda.status_code == 200
+    assert segunda["X-Idempotent-Replay"] == "true"
+
+
+def test_editar_con_una_base_desactualizada_devuelve_conflicto(operario, supervisor, area):
+    """El celular estuvo sin señal y el supervisor cerró el hallazgo en el medio."""
+    creado = auth_client(operario).post(
+        reverse("report-list"), {"kind": "CONDICION", "area": area.id}, format="json"
+    )
+    reporte = Report.objects.get(id=creado.data["id"])
+    base_vieja = reporte.updated_at.isoformat()
+
+    auth_client(supervisor).post(
+        reverse("report-close", args=[reporte.id]),
+        {"closure_note": "Se señalizó la zona."},
+        format="json",
+    )
+
+    conflicto = auth_client(supervisor).patch(
+        reverse("report-detail", args=[reporte.id]),
+        {"description": "Otra cosa", "base_updated_at": base_vieja},
+        format="json",
+    )
+
+    assert conflicto.status_code == 409
+    assert conflicto.data["code"] == "sync_conflict"
+    assert conflicto.data["server_version"]["status"] == ReportStatus.CERRADO
+    assert conflicto.data["your_base_updated_at"] == base_vieja
+
+
+def test_editar_con_la_base_al_dia_funciona(operario, supervisor, area):
+    creado = auth_client(operario).post(
+        reverse("report-list"), {"kind": "CONDICION", "area": area.id}, format="json"
+    )
+    reporte = Report.objects.get(id=creado.data["id"])
+
+    respuesta = auth_client(supervisor).patch(
+        reverse("report-detail", args=[reporte.id]),
+        {"description": "Descripción corregida", "base_updated_at": reporte.updated_at.isoformat()},
+        format="json",
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.data["description"] == "Descripción corregida"
+
+
+def test_sin_base_updated_at_se_conserva_el_comportamiento_de_siempre(
+    operario, supervisor, area
+):
+    """La comprobación es opcional: quien no la manda escribe como antes."""
+    creado = auth_client(operario).post(
+        reverse("report-list"), {"kind": "CONDICION", "area": area.id}, format="json"
+    )
+
+    respuesta = auth_client(supervisor).patch(
+        reverse("report-detail", args=[creado.data["id"]]),
+        {"description": "Sin control de concurrencia"},
+        format="json",
+    )
+
+    assert respuesta.status_code == 200
+
+
+def test_cerrar_con_una_base_desactualizada_tambien_da_conflicto(operario, supervisor, area):
+    creado = auth_client(operario).post(
+        reverse("report-list"), {"kind": "CONDICION", "area": area.id}, format="json"
+    )
+    reporte = Report.objects.get(id=creado.data["id"])
+    base_vieja = reporte.updated_at.isoformat()
+    auth_client(supervisor).post(
+        reverse("report-assign", args=[reporte.id]), {"assigned_to": supervisor.id}, format="json"
+    )
+
+    conflicto = auth_client(supervisor).post(
+        reverse("report-close", args=[reporte.id]),
+        {"closure_note": "Listo", "base_updated_at": base_vieja},
+        format="json",
+    )
+
+    assert conflicto.status_code == 409
