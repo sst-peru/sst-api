@@ -2,9 +2,13 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic import RedirectView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
+    # La raiz no sirve contenido: el API no tiene pagina. Mandamos al visitante a la
+    # documentacion, que es lo unico navegable que ofrece el servicio.
+    path("", RedirectView.as_view(url="/api/docs/", permanent=False), name="root"),
     path("admin/", admin.site.urls),
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/", include("apps.reports.urls")),
