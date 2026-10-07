@@ -152,6 +152,11 @@ class AccidentCreateSerializer(serializers.ModelSerializer):
             "injured_dni", "lost_days", "origin_report", "occurred_at",
         )
         extra_kwargs = {
+            "injured_dni": {
+                "error_messages": {
+                    "max_length": "El DNI debe tener exactamente 8 dígitos.",
+                }
+            },
             "description": {
                 "error_messages": {
                     "required": "Describe qué ocurrió.",

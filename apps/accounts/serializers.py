@@ -305,7 +305,15 @@ class CompanyRegisterSerializer(serializers.Serializer):
     email = serializers.EmailField(required=False, allow_blank=True, default="")
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150)
-    dni = serializers.CharField(max_length=8, required=False, allow_blank=True, default="")
+    dni = serializers.CharField(
+        max_length=8,
+        required=False,
+        allow_blank=True,
+        default="",
+        # max_length se evalúa antes que validate_dni, así que el mensaje de «muy largo»
+        # tiene que estar aquí o el usuario recibe el texto por defecto de DRF.
+        error_messages={"max_length": "El DNI debe tener exactamente 8 dígitos."},
+    )
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True)
