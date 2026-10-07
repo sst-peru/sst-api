@@ -1,0 +1,7 @@
+from django.apps import AppConfig
+
+
+class AccidentsConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "apps.accidents"
+    verbose_name = "accidentes y enfermedades ocupacionales"

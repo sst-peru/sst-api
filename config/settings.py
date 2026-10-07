@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     # Propias
     "apps.accounts",
     "apps.reports",
+    "apps.accidents",
     "apps.iperc",
     "apps.epp",
     "apps.inspections",
@@ -177,6 +178,15 @@ SPECTACULAR_SETTINGS = {
                 "El ciclo de vida del hallazgo: registro desde campo con evidencia, "
                 "ubicación y fecha real de ocurrencia; asignación de responsable; cierre "
                 "con acción correctiva; y la bitácora que deja constancia de cada paso."
+            ),
+        },
+        {
+            "name": "Accidentes y enfermedades ocupacionales",
+            "description": (
+                "Registro de accidentes de trabajo, incidentes peligrosos y enfermedades "
+                "ocupacionales; investigación de causa raíz; medidas correctivas con "
+                "responsable, plazo y verificación; y control del plazo de 24 horas para "
+                "avisar al Ministerio de Trabajo que fija el artículo 82 de la ley."
             ),
         },
         {

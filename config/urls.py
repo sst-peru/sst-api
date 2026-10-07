@@ -12,6 +12,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/", include("apps.reports.urls")),
+    path("api/v1/", include("apps.accidents.urls")),
     path("api/v1/", include("apps.iperc.urls")),
     path("api/v1/", include("apps.epp.urls")),
     path("api/v1/", include("apps.inspections.urls")),
