@@ -83,8 +83,15 @@ class ReportSerializer(serializers.ModelSerializer):
         if instance.is_anonymous and not self._es_el_autor(instance):
             # El id del autor identifica igual que el nombre: también se va.
             datos["reported_by"] = None
-            for accion, origen in zip(datos.get("actions", []), instance.actions.all(), strict=False):
-                if origen.author_id == instance.reported_by_id:
+            # Se cruzan por id y no por posición: las dos consultas no garantizan el
+            # mismo orden, y emparejar por posición podría enmascarar al autor equivocado.
+            del_autor = {
+                accion.id
+                for accion in instance.actions.all()
+                if accion.author_id == instance.reported_by_id
+            }
+            for accion in datos.get("actions", []):
+                if accion.get("id") in del_autor:
                     accion["author_name"] = "Anónimo"
         return datos
 

@@ -91,6 +91,59 @@ class CompanyView(generics.RetrieveUpdateAPIView):
         return empresa
 
 
+@extend_schema(tags=["Privacidad y datos personales"])
+class PrivacyView(APIView):
+    """Estado de privacidad del usuario y uso de su ubicación.
+
+    GET devuelve la versión vigente de la política, si hay consentimiento y el historial.
+    PATCH enciende o apaga el envío de la ubicación en los reportes.
+    """
+
+    @extend_schema(responses=PrivacyStateSerializer)
+    def get(self, request):
+        return Response(PrivacyStateSerializer.estado(request.user))
+
+    @extend_schema(request=PrivacyStateSerializer, responses=PrivacyStateSerializer)
+    def patch(self, request):
+        serializer = PrivacyStateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        if "location_sharing" in serializer.validated_data:
+            request.user.location_sharing = serializer.validated_data["location_sharing"]
+            request.user.save(update_fields=["location_sharing"])
+        return Response(PrivacyStateSerializer.estado(request.user))
+
+
+@extend_schema(tags=["Privacidad y datos personales"])
+class PrivacyConsentView(APIView):
+    """Otorga o revoca el consentimiento para el tratamiento de datos personales.
+
+    POST registra el consentimiento con fecha, versión de la política y origen. DELETE lo
+    revoca: la Ley N° 29733 exige que sea tan fácil retirarlo como darlo, y revocarlo
+    apaga también el envío de la ubicación, que es el dato más sensible que se recoge.
+    """
+
+    @extend_schema(request=PrivacyConsentWriteSerializer, responses=PrivacyStateSerializer)
+    def post(self, request):
+        serializer = PrivacyConsentWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        # Idempotente: volver a aceptar con un consentimiento vigente no crea otro registro.
+        if request.user.privacy_consent is None:
+            PrivacyConsent.objects.create(
+                user=request.user,
+                policy_version=POLITICA_PRIVACIDAD_VERSION,
+                source=serializer.validated_data["source"],
+            )
+        return Response(PrivacyStateSerializer.estado(request.user))
+
+    @extend_schema(responses=PrivacyStateSerializer)
+    def delete(self, request):
+        ahora = timezone.now()
+        request.user.consents.filter(revoked_at__isnull=True).update(revoked_at=ahora)
+        request.user.location_sharing = False
+        request.user.save(update_fields=["location_sharing"])
+        return Response(PrivacyStateSerializer.estado(request.user))
+
+
 @extend_schema(tags=["Empresa, áreas y usuarios"])
 class AreaViewSet(viewsets.ModelViewSet):
     serializer_class = AreaSerializer
