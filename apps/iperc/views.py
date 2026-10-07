@@ -1,10 +1,12 @@
 from django.db.models import Max
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 
 from .models import IpercEntry, IpercMatrix
 from .serializers import IpercEntrySerializer, IpercMatrixSerializer
 
 
+@extend_schema(tags=["Matriz IPERC"])
 class IpercMatrixViewSet(viewsets.ModelViewSet):
     serializer_class = IpercMatrixSerializer
     filterset_fields = ("status",)
@@ -20,6 +22,7 @@ class IpercMatrixViewSet(viewsets.ModelViewSet):
         serializer.save(company=company, version=last + 1)
 
 
+@extend_schema(tags=["Matriz IPERC"])
 class IpercEntryViewSet(viewsets.ModelViewSet):
     serializer_class = IpercEntrySerializer
     filterset_fields = ("matrix", "area", "probability", "consequence")

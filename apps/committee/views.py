@@ -1,4 +1,5 @@
 from django.db.models import Max
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
@@ -33,6 +34,7 @@ class ManagerOnlyMixin:
             raise PermissionDenied("Solo supervisor o comité de SST puede hacer esto.")
 
 
+@extend_schema(tags=["Comité de SST"])
 class CommitteeViewSet(ManagerOnlyMixin, viewsets.ModelViewSet):
     serializer_class = CommitteeSerializer
 
@@ -52,6 +54,7 @@ class CommitteeViewSet(ManagerOnlyMixin, viewsets.ModelViewSet):
         )
 
 
+@extend_schema(tags=["Comité de SST"])
 class CommitteeMemberViewSet(ManagerOnlyMixin, viewsets.ModelViewSet):
     serializer_class = CommitteeMemberSerializer
     filterset_fields = ("role", "represents", "is_active")
@@ -62,6 +65,7 @@ class CommitteeMemberViewSet(ManagerOnlyMixin, viewsets.ModelViewSet):
         ).select_related("user")
 
 
+@extend_schema(tags=["Comité de SST"])
 class MeetingViewSet(ManagerOnlyMixin, viewsets.ModelViewSet):
     serializer_class = MeetingSerializer
     filterset_fields = ("is_extraordinary",)
@@ -82,6 +86,7 @@ class MeetingViewSet(ManagerOnlyMixin, viewsets.ModelViewSet):
         serializer.save(committee=committee, number=last + 1)
 
 
+@extend_schema(tags=["Comité de SST"])
 class AgreementViewSet(ManagerOnlyMixin, viewsets.ModelViewSet):
     serializer_class = AgreementSerializer
     filterset_fields = ("status", "responsible", "meeting")
@@ -92,6 +97,7 @@ class AgreementViewSet(ManagerOnlyMixin, viewsets.ModelViewSet):
         ).select_related("responsible", "meeting")
 
 
+@extend_schema(tags=["Indicadores del SGSST"])
 class CommitteeComplianceView(APIView):
     """Cumplimiento del comité: reuniones del año y acuerdos cerrados.
 

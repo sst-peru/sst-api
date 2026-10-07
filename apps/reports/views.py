@@ -31,6 +31,7 @@ def _clear_prefetch_cache(report: Report) -> None:
         report._prefetched_objects_cache = {}
 
 
+@extend_schema(tags=["Reportes de actos y condiciones inseguras"])
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
 
@@ -41,6 +42,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         serializer.save(company=self.request.user.company)
 
 
+@extend_schema(tags=["Reportes de actos y condiciones inseguras"])
 class ReportViewSet(viewsets.ModelViewSet):
     """Reportes de actos y condiciones inseguras. Mismo endpoint para web y móvil."""
 
@@ -141,6 +143,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         return Response(ReportSerializer(report).data)
 
 
+@extend_schema(tags=["Indicadores del SGSST"])
 class MttrView(APIView):
     """MTTR: promedio de horas entre el reporte de un peligro y su cierre.
 
@@ -184,6 +187,7 @@ class MttrView(APIView):
         )
 
 
+@extend_schema(tags=["Indicadores del SGSST"])
 class ReportSummaryView(APIView):
     """Conteos para los tableros de la web: por estado, tipo, área y severidad."""
 

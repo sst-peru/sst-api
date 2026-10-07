@@ -1,8 +1,12 @@
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, viewsets
-from rest_framework_simplejwt.views import TokenObtainPairView
-
 from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+    TokenVerifyView,
+)
 
 from .models import Area
 from .serializers import (
@@ -18,16 +22,29 @@ from .serializers import (
 User = get_user_model()
 
 
+@extend_schema(tags=["Autenticación y sesión"])
 class SSTTokenObtainPairView(TokenObtainPairView):
     serializer_class = SSTTokenObtainPairSerializer
 
 
+@extend_schema(tags=["Autenticación y sesión"])
+class SSTTokenRefreshView(TokenRefreshView):
+    """Renueva el token de acceso a partir del refresh, sin volver a pedir la contraseña."""
+
+
+@extend_schema(tags=["Autenticación y sesión"])
+class SSTTokenVerifyView(TokenVerifyView):
+    """Comprueba que un token siga siendo válido."""
+
+
+@extend_schema(tags=["Registro"])
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = (permissions.AllowAny,)
     queryset = User.objects.all()
 
 
+@extend_schema(tags=["Registro"])
 class CompanyRegisterView(generics.CreateAPIView):
     """Registro de empresa: crea la empresa y la cuenta de su administrador.
 
@@ -39,6 +56,7 @@ class CompanyRegisterView(generics.CreateAPIView):
     permission_classes = (permissions.AllowAny,)
 
 
+@extend_schema(tags=["Autenticación y sesión"])
 class MeView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
 
@@ -46,6 +64,7 @@ class MeView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
+@extend_schema(tags=["Empresa, áreas y usuarios"])
 class CompanyView(generics.RetrieveUpdateAPIView):
     """Datos de la empresa del usuario autenticado.
 
@@ -67,6 +86,7 @@ class CompanyView(generics.RetrieveUpdateAPIView):
         return empresa
 
 
+@extend_schema(tags=["Empresa, áreas y usuarios"])
 class AreaViewSet(viewsets.ModelViewSet):
     serializer_class = AreaSerializer
 
@@ -77,6 +97,7 @@ class AreaViewSet(viewsets.ModelViewSet):
         serializer.save(company=self.request.user.company)
 
 
+@extend_schema(tags=["Empresa, áreas y usuarios"])
 class UserViewSet(viewsets.ModelViewSet):
     """Usuarios de la empresa.
 

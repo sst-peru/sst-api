@@ -12,12 +12,14 @@ from .models import Assignment, Experiment
 from .serializers import AssignmentSerializer, ExperimentSerializer
 
 
+@extend_schema(tags=["Experimento A/B"])
 class ExperimentViewSet(viewsets.ModelViewSet):
     queryset = Experiment.objects.all()
     serializer_class = ExperimentSerializer
     lookup_field = "key"
 
 
+@extend_schema(tags=["Experimento A/B"])
 class MyVariantView(APIView):
     """Qué variante le toca al usuario actual. La app móvil y la web llaman esto al entrar."""
 
@@ -36,6 +38,7 @@ class MyVariantView(APIView):
         return Response(AssignmentSerializer(assignment).data)
 
 
+@extend_schema(tags=["Experimento A/B"])
 class ExperimentResultsView(APIView):
     """Resultados del A/B test: reportes por usuario en cada variante.
 

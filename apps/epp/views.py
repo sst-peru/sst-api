@@ -1,9 +1,11 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 
 from .models import EppDelivery, EppItem
 from .serializers import EppDeliverySerializer, EppItemSerializer
 
 
+@extend_schema(tags=["Equipos de protección personal"])
 class EppItemViewSet(viewsets.ModelViewSet):
     serializer_class = EppItemSerializer
 
@@ -14,6 +16,7 @@ class EppItemViewSet(viewsets.ModelViewSet):
         serializer.save(company=self.request.user.company)
 
 
+@extend_schema(tags=["Equipos de protección personal"])
 class EppDeliveryViewSet(viewsets.ModelViewSet):
     serializer_class = EppDeliverySerializer
     filterset_fields = ("item", "worker", "acknowledged")

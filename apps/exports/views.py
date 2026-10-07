@@ -11,6 +11,7 @@ from django.utils import timezone
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
 
@@ -70,6 +71,7 @@ class _BaseExport(APIView):
             return default
 
 
+@extend_schema(tags=["Exportaciones para SUNAFIL"])
 class ReportsExportView(_BaseExport):
     def get(self, request):
         desde = timezone.now() - timedelta(days=self._dias(request))
@@ -117,6 +119,7 @@ class ReportsExportView(_BaseExport):
         return _responder(wb, "registro_actos_condiciones_inseguras")
 
 
+@extend_schema(tags=["Exportaciones para SUNAFIL"])
 class IpercExportView(_BaseExport):
     def get(self, request):
         qs = (
@@ -160,6 +163,7 @@ class IpercExportView(_BaseExport):
         return _responder(wb, "matriz_iperc")
 
 
+@extend_schema(tags=["Exportaciones para SUNAFIL"])
 class EppExportView(_BaseExport):
     def get(self, request):
         qs = (
@@ -193,6 +197,7 @@ class EppExportView(_BaseExport):
         return _responder(wb, "registro_entrega_epp")
 
 
+@extend_schema(tags=["Exportaciones para SUNAFIL"])
 class InspectionsExportView(_BaseExport):
     def get(self, request):
         qs = (
@@ -225,6 +230,7 @@ class InspectionsExportView(_BaseExport):
         return _responder(wb, "programa_inspecciones")
 
 
+@extend_schema(tags=["Exportaciones para SUNAFIL"])
 class CommitteeExportView(_BaseExport):
     def get(self, request):
         committee = Committee.objects.filter(company=request.user.company_id).first()

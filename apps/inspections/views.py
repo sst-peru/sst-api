@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.db.models import Count, F, Q
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -11,6 +12,7 @@ from .models import Inspection, InspectionSchedule, InspectionStatus
 from .serializers import InspectionScheduleSerializer, InspectionSerializer
 
 
+@extend_schema(tags=["Inspecciones periódicas"])
 class InspectionScheduleViewSet(viewsets.ModelViewSet):
     serializer_class = InspectionScheduleSerializer
     filterset_fields = ("area", "frequency", "is_active")
@@ -29,6 +31,7 @@ class InspectionScheduleViewSet(viewsets.ModelViewSet):
         return Response(InspectionSerializer(inspection).data, status=201)
 
 
+@extend_schema(tags=["Inspecciones periódicas"])
 class InspectionViewSet(viewsets.ModelViewSet):
     serializer_class = InspectionSerializer
     filterset_fields = ("schedule", "status", "schedule__area")
@@ -50,6 +53,7 @@ class InspectionViewSet(viewsets.ModelViewSet):
         return Response(InspectionSerializer(inspection).data)
 
 
+@extend_schema(tags=["Indicadores del SGSST"])
 class InspectionComplianceView(APIView):
     """Tasa de cumplimiento: inspecciones realizadas a tiempo / programadas.
 
