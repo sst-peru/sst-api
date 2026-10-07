@@ -227,6 +227,15 @@ SPECTACULAR_SETTINGS = {
             ),
         },
         {
+            "name": "Privacidad y datos personales",
+            "description": (
+                "Consentimiento informado para el tratamiento de datos personales y "
+                "control del uso de la ubicación, conforme a la Ley N° 29733. El "
+                "consentimiento queda con fecha, versión de la política y origen, y se "
+                "revoca con la misma facilidad con que se otorga."
+            ),
+        },
+        {
             "name": "Experimento A/B",
             "description": (
                 "Soporte del experimento del curso: asignación determinista de variante "

@@ -99,6 +99,12 @@ class Report(models.Model):
     form_variant = models.CharField("variante de formulario", max_length=20, blank=True)
     synced_offline = models.BooleanField("llegó por sincronización offline", default=False)
 
+    # Reporte anonimo: la identidad se guarda —hace falta para que el autor vea lo
+    # suyo y para el aislamiento por empresa— pero el API no la expone a nadie mas.
+    # Sin esta opcion, denunciar el acto inseguro de un companero o de un jefe tiene
+    # un costo que la mayoria no esta dispuesta a pagar, y el peligro no se reporta.
+    is_anonymous = models.BooleanField("reporte anónimo", default=False)
+
     class Meta:
         verbose_name = "reporte"
         verbose_name_plural = "reportes"

@@ -58,6 +58,7 @@ class Command(BaseCommand):
             defaults={
                 "name": "Constructora Los Andes S.A.C.",
                 "address": "Av. Javier Prado Este 1234, San Isidro, Lima",
+                "is_demo": True,
                 "worker_count": 45,
             },
         )

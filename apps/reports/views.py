@@ -74,13 +74,19 @@ class ReportViewSet(viewsets.ModelViewSet):
         if client_uuid:
             existing = Report.objects.filter(client_uuid=client_uuid).first()
             if existing is not None:
-                return Response(ReportSerializer(existing).data, status=status.HTTP_200_OK)
+                return Response(ReportSerializer(existing, context={"request": request}).data, status=status.HTTP_200_OK)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        extra = {}
+        # Ubicacion revocable: si el trabajador la apago, el servidor no la guarda aunque
+        # el cliente la mande. La decision no puede quedar solo en el cliente, porque una
+        # version vieja de la app seguiria enviandola.
+        if not request.user.location_sharing:
+            extra = {"latitude": None, "longitude": None}
         report = serializer.save(
-            reported_by=request.user, company=request.user.company
+            reported_by=request.user, company=request.user.company, **extra
         )
-        return Response(ReportSerializer(report).data, status=status.HTTP_201_CREATED)
+        return Response(ReportSerializer(report, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
     def _require_manager(self):
         if not self.request.user.can_manage:
@@ -105,7 +111,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             new_status=report.status,
         )
         _clear_prefetch_cache(report)
-        return Response(ReportSerializer(report).data)
+        return Response(ReportSerializer(report, context={"request": request}).data)
 
     @extend_schema(request=ReportCloseSerializer, responses=ReportSerializer)
     @action(detail=True, methods=["post"])
@@ -120,7 +126,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             report=report, author=request.user, note=note, new_status=ReportStatus.CERRADO
         )
         _clear_prefetch_cache(report)
-        return Response(ReportSerializer(report).data)
+        return Response(ReportSerializer(report, context={"request": request}).data)
 
     @extend_schema(request=ReportStatusSerializer, responses=ReportSerializer)
     @action(detail=True, methods=["post"], url_path="change-status")
@@ -140,7 +146,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             new_status=new_status,
         )
         _clear_prefetch_cache(report)
-        return Response(ReportSerializer(report).data)
+        return Response(ReportSerializer(report, context={"request": request}).data)
 
 
 @extend_schema(tags=["Indicadores del SGSST"])

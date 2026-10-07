@@ -1,5 +1,11 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
+
+# Version vigente de la politica de privacidad. Al publicar una nueva se sube esta
+# constante y el consentimiento anterior deja de valer: la Ley N° 29733 exige que el
+# consentimiento sea informado, y no lo es si la politica cambio despues de darlo.
+POLITICA_PRIVACIDAD_VERSION = "2026-10"
 
 
 class Company(models.Model):
@@ -10,6 +16,9 @@ class Company(models.Model):
     address = models.CharField("dirección", max_length=255, blank=True)
     # Con menos de 20 trabajadores la ley pide supervisor en vez de comité.
     worker_count = models.PositiveIntegerField("número de trabajadores", default=1)
+    # Marca la empresa que carga el comando seed_demo. La usan las pantallas de
+    # metricas para advertir que lo que se ve no es una operacion real.
+    is_demo = models.BooleanField("datos de demostración", default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -87,6 +96,12 @@ class User(AbstractUser):
     dni = models.CharField("DNI", max_length=8, blank=True)
     phone = models.CharField("teléfono", max_length=20, blank=True)
 
+    # La ubicacion del hallazgo es util pero no imprescindible: el trabajador puede
+    # apagarla cuando quiera y el API deja de guardarla desde ese momento. Arranca
+    # activa porque ubicar el peligro es parte del valor del reporte, y el
+    # consentimiento de privacidad la menciona expresamente antes de pedirla.
+    location_sharing = models.BooleanField("comparte su ubicación", default=True)
+
     class Meta:
         verbose_name = "usuario"
         verbose_name_plural = "usuarios"
@@ -98,3 +113,50 @@ class User(AbstractUser):
     def can_manage(self) -> bool:
         """Puede asignar responsables y cerrar hallazgos."""
         return self.role in {Role.SUPERVISOR, Role.COMITE, Role.ADMIN}
+
+    @property
+    def privacy_consent(self):
+        """Consentimiento vigente para la version actual de la politica, si existe."""
+        return (
+            self.consents.filter(
+                policy_version=POLITICA_PRIVACIDAD_VERSION, revoked_at__isnull=True
+            )
+            .order_by("-granted_at")
+            .first()
+        )
+
+    @property
+    def has_accepted_privacy_policy(self) -> bool:
+        return self.privacy_consent is not None
+
+
+class PrivacyConsent(models.Model):
+    """Consentimiento informado para el tratamiento de datos personales.
+
+    La Ley N° 29733 pide que el consentimiento sea previo, informado, expreso e
+    inequivoco, y que se pueda probar. Por eso no es un booleano en el usuario sino un
+    registro con fecha, version de la politica y origen: queda el historial de cuando se
+    dio y cuando se revoco, que es lo unico que sirve como prueba.
+    """
+
+    class Source(models.TextChoices):
+        WEB = "WEB", "Panel web"
+        ANDROID = "ANDROID", "Aplicación Android"
+
+    user = models.ForeignKey(
+        "accounts.User", on_delete=models.CASCADE, related_name="consents"
+    )
+    policy_version = models.CharField("versión de la política", max_length=20)
+    granted_at = models.DateTimeField("otorgado el", default=timezone.now)
+    revoked_at = models.DateTimeField("revocado el", null=True, blank=True)
+    source = models.CharField(
+        "origen", max_length=10, choices=Source.choices, default=Source.WEB
+    )
+
+    class Meta:
+        verbose_name = "consentimiento de privacidad"
+        verbose_name_plural = "consentimientos de privacidad"
+        ordering = ("-granted_at",)
+
+    def __str__(self) -> str:
+        return "%s · %s" % (self.user, self.policy_version)

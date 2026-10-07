@@ -4,7 +4,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import Area, Company, Role
+from .models import POLITICA_PRIVACIDAD_VERSION, Area, Company, PrivacyConsent, Role
 
 User = get_user_model()
 
@@ -94,12 +94,17 @@ class AreaSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source="company.name", read_only=True)
     area_name = serializers.CharField(source="area.name", read_only=True, default=None)
+    # Los clientes lo leen al iniciar sesion: si no hay consentimiento vigente, la web y
+    # el movil muestran la politica antes de dejar reportar.
+    has_accepted_privacy_policy = serializers.BooleanField(read_only=True)
+    company_is_demo = serializers.BooleanField(source="company.is_demo", read_only=True)
 
     class Meta:
         model = User
         fields = (
             "id", "username", "email", "first_name", "last_name",
             "role", "dni", "phone", "company", "company_name", "area", "area_name",
+            "location_sharing", "has_accepted_privacy_policy", "company_is_demo",
         )
         read_only_fields = ("role", "company")
 
@@ -359,3 +364,54 @@ class CompanyRegisterSerializer(serializers.Serializer):
             "user": UserSerializer(instance).data,
             "company": CompanySerializer(instance.company).data,
         }
+
+
+class PrivacyConsentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PrivacyConsent
+        fields = ("id", "policy_version", "granted_at", "revoked_at", "source")
+
+
+class PrivacyStateSerializer(serializers.Serializer):
+    """Estado de privacidad del usuario: consentimiento vigente y uso de la ubicación."""
+
+    policy_version = serializers.CharField(read_only=True)
+    accepted = serializers.BooleanField(read_only=True)
+    granted_at = serializers.DateTimeField(read_only=True, allow_null=True)
+    location_sharing = serializers.BooleanField()
+    history = PrivacyConsentSerializer(many=True, read_only=True)
+
+    @staticmethod
+    def estado(user):
+        consentimiento = user.privacy_consent
+        return {
+            "policy_version": POLITICA_PRIVACIDAD_VERSION,
+            "accepted": consentimiento is not None,
+            "granted_at": consentimiento.granted_at if consentimiento else None,
+            "location_sharing": user.location_sharing,
+            "history": PrivacyConsentSerializer(user.consents.all(), many=True).data,
+        }
+
+
+class PrivacyConsentWriteSerializer(serializers.Serializer):
+    """Otorgamiento del consentimiento. El cliente declara desde dónde se dio."""
+
+    source = serializers.ChoiceField(
+        choices=PrivacyConsent.Source.choices, default=PrivacyConsent.Source.WEB
+    )
+    accept_policy_version = serializers.CharField(
+        help_text="Versión de la política que el usuario está aceptando."
+    )
+
+    def validate_accept_policy_version(self, value):
+        """Se rechaza aceptar una versión que no es la vigente.
+
+        Si el cliente quedó con una copia vieja de la política, lo que el usuario leyó no
+        es lo que estaría aceptando, y el consentimiento dejaría de ser informado.
+        """
+        if value != POLITICA_PRIVACIDAD_VERSION:
+            raise serializers.ValidationError(
+                "La política vigente es la versión %s. Vuelve a cargar la página para "
+                "leerla antes de aceptarla." % POLITICA_PRIVACIDAD_VERSION
+            )
+        return value

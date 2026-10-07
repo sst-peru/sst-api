@@ -6,6 +6,8 @@ from .views import (
     CompanyRegisterView,
     CompanyView,
     MeView,
+    PrivacyConsentView,
+    PrivacyView,
     RegisterView,
     SSTTokenObtainPairView,
     SSTTokenRefreshView,
@@ -25,5 +27,7 @@ urlpatterns = [
     path("verify/", SSTTokenVerifyView.as_view(), name="token-verify"),
     path("me/", MeView.as_view(), name="me"),
     path("company/", CompanyView.as_view(), name="company"),
+    path("privacy/", PrivacyView.as_view(), name="privacy"),
+    path("privacy/consent/", PrivacyConsentView.as_view(), name="privacy-consent"),
     path("", include(router.urls)),
 ]

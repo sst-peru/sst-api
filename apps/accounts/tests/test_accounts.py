@@ -496,3 +496,92 @@ def test_el_ruc_de_la_empresa_no_se_puede_cambiar(company, supervisor):
     assert response.status_code == 200
     company.refresh_from_db()
     assert company.ruc == "20100000004"
+
+
+# --- Privacidad y datos personales (Ley N° 29733) ---
+
+
+def test_un_usuario_nuevo_no_tiene_consentimiento_vigente(operario):
+    response = auth(operario).get(reverse("privacy"))
+
+    assert response.status_code == 200
+    assert response.data["accepted"] is False
+    assert response.data["granted_at"] is None
+    assert response.data["policy_version"]
+
+
+def test_otorgar_el_consentimiento_queda_con_fecha_version_y_origen(operario):
+    version = auth(operario).get(reverse("privacy")).data["policy_version"]
+
+    response = auth(operario).post(
+        reverse("privacy-consent"),
+        {"accept_policy_version": version, "source": "WEB"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["accepted"] is True
+    assert response.data["granted_at"] is not None
+    assert response.data["history"][0]["source"] == "WEB"
+    assert response.data["history"][0]["policy_version"] == version
+
+
+def test_no_se_acepta_una_version_de_la_politica_que_no_es_la_vigente(operario):
+    """Si el cliente tiene una copia vieja, lo que el usuario leyó no es lo que aceptaría."""
+    response = auth(operario).post(
+        reverse("privacy-consent"), {"accept_policy_version": "1999-01"}, format="json"
+    )
+
+    assert response.status_code == 400
+    assert "La política vigente es la versión" in str(response.data["accept_policy_version"][0])
+
+
+def test_otorgar_dos_veces_no_duplica_el_consentimiento(operario):
+    version = auth(operario).get(reverse("privacy")).data["policy_version"]
+    for _ in range(3):
+        auth(operario).post(
+            reverse("privacy-consent"), {"accept_policy_version": version}, format="json"
+        )
+
+    assert auth(operario).get(reverse("privacy")).data["history"].__len__() == 1
+
+
+def test_revocar_el_consentimiento_tambien_apaga_la_ubicacion(operario):
+    version = auth(operario).get(reverse("privacy")).data["policy_version"]
+    auth(operario).post(
+        reverse("privacy-consent"), {"accept_policy_version": version}, format="json"
+    )
+
+    response = auth(operario).delete(reverse("privacy-consent"))
+
+    assert response.status_code == 200
+    assert response.data["accepted"] is False
+    assert response.data["location_sharing"] is False
+    # El registro no se borra: queda el historial de que se dio y se revocó.
+    assert response.data["history"][0]["revoked_at"] is not None
+
+
+def test_la_ubicacion_se_puede_apagar_y_volver_a_encender(operario):
+    apagada = auth(operario).patch(
+        reverse("privacy"), {"location_sharing": False}, format="json"
+    )
+    assert apagada.data["location_sharing"] is False
+
+    encendida = auth(operario).patch(
+        reverse("privacy"), {"location_sharing": True}, format="json"
+    )
+    assert encendida.data["location_sharing"] is True
+
+
+def test_el_usuario_informa_a_los_clientes_si_falta_el_consentimiento(operario):
+    """La web y el móvil lo leen al iniciar sesión para mostrar la política antes de reportar."""
+    antes = auth(operario).get(reverse("me")).data
+    assert antes["has_accepted_privacy_policy"] is False
+    assert antes["location_sharing"] is True
+
+    version = auth(operario).get(reverse("privacy")).data["policy_version"]
+    auth(operario).post(
+        reverse("privacy-consent"), {"accept_policy_version": version}, format="json"
+    )
+
+    assert auth(operario).get(reverse("me")).data["has_accepted_privacy_policy"] is True

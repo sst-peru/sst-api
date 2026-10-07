@@ -1,18 +1,23 @@
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, viewsets
 from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
     TokenVerifyView,
 )
 
-from .models import Area
+from .models import POLITICA_PRIVACIDAD_VERSION, Area, PrivacyConsent
 from .serializers import (
     AreaSerializer,
     CompanyRegisterSerializer,
     CompanySerializer,
+    PrivacyConsentWriteSerializer,
+    PrivacyStateSerializer,
     RegisterSerializer,
     SSTTokenObtainPairSerializer,
     UserSerializer,

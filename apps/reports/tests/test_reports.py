@@ -7,7 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.accounts.models import Area, Company, Role
-from apps.reports.models import Report, ReportStatus
+from apps.reports.models import Report, ReportAction, ReportStatus
 
 User = get_user_model()
 
@@ -137,3 +137,108 @@ def test_occurred_at_puede_ser_anterior_al_registro(operario, area, company):
         company=company, reported_by=operario, kind="CONDICION", area=area, occurred_at=ayer
     )
     assert report.occurred_at < report.created_at
+
+
+# --- Reporte anónimo (US116) ---
+
+
+def crear_anonimo(user, area, anonimo=True):
+    return auth_client(user).post(
+        reverse("report-list"),
+        {
+            "kind": "ACTO",
+            "area": area.id,
+            "description": "El encargado de turno trabaja en altura sin arnés.",
+            "is_anonymous": anonimo,
+        },
+        format="json",
+    )
+
+
+def test_el_supervisor_no_ve_quien_hizo_un_reporte_anonimo(operario, supervisor, area):
+    """Si el jefe del área puede ver quién lo reportó, la opción no sirve para nada."""
+    creado = crear_anonimo(operario, area)
+    assert creado.status_code == 201
+
+    visto = auth_client(supervisor).get(reverse("report-detail", args=[creado.data["id"]]))
+
+    assert visto.status_code == 200
+    assert visto.data["is_anonymous"] is True
+    assert visto.data["reported_by_name"] == "Anónimo"
+    assert visto.data["reported_by"] is None
+
+
+def test_el_autor_si_se_ve_a_si_mismo_en_su_reporte_anonimo(operario, area):
+    """Tiene que poder seguir su propio reporte: el anonimato es frente a los demás."""
+    creado = crear_anonimo(operario, area)
+
+    visto = auth_client(operario).get(reverse("report-detail", args=[creado.data["id"]]))
+
+    assert visto.data["reported_by"] == operario.id
+    assert visto.data["reported_by_name"] != "Anónimo"
+
+
+def test_la_identidad_se_guarda_aunque_no_se_exponga(operario, area):
+    """Hace falta en la base para el aislamiento por empresa y para que el autor lo vea."""
+    creado = crear_anonimo(operario, area)
+
+    assert Report.objects.get(id=creado.data["id"]).reported_by_id == operario.id
+
+
+def test_un_reporte_normal_sigue_mostrando_su_autor(operario, supervisor, area):
+    creado = crear_anonimo(operario, area, anonimo=False)
+
+    visto = auth_client(supervisor).get(reverse("report-detail", args=[creado.data["id"]]))
+
+    assert visto.data["is_anonymous"] is False
+    assert visto.data["reported_by"] == operario.id
+
+
+def test_la_bitacora_tambien_oculta_al_autor_anonimo(operario, supervisor, area):
+    creado = crear_anonimo(operario, area)
+    reporte = Report.objects.get(id=creado.data["id"])
+    ReportAction.objects.create(report=reporte, author=operario, note="Lo vi otra vez hoy.")
+
+    visto = auth_client(supervisor).get(reverse("report-detail", args=[reporte.id]))
+    autores = {a["author_name"] for a in visto.data["actions"]}
+
+    assert autores == {"Anónimo"}
+
+
+# --- Ubicación opcional y revocable (US112) ---
+
+
+def test_con_la_ubicacion_apagada_el_servidor_no_la_guarda(operario, area):
+    """La decisión no puede quedar solo en el cliente: una app vieja seguiría enviándola."""
+    operario.location_sharing = False
+    operario.save()
+
+    creado = auth_client(operario).post(
+        reverse("report-list"),
+        {"kind": "CONDICION", "area": area.id, "latitude": "-12.046374", "longitude": "-77.042793"},
+        format="json",
+    )
+
+    assert creado.status_code == 201
+    assert creado.data["latitude"] is None
+    assert creado.data["longitude"] is None
+
+
+def test_con_la_ubicacion_encendida_se_guarda_normalmente(operario, area):
+    creado = auth_client(operario).post(
+        reverse("report-list"),
+        {"kind": "CONDICION", "area": area.id, "latitude": "-12.046374", "longitude": "-77.042793"},
+        format="json",
+    )
+
+    assert creado.status_code == 201
+    assert creado.data["latitude"] is not None
+
+
+def test_el_reporte_no_necesita_ubicacion_para_crearse(operario, area):
+    creado = auth_client(operario).post(
+        reverse("report-list"), {"kind": "CONDICION", "area": area.id}, format="json"
+    )
+
+    assert creado.status_code == 201
+    assert creado.data["latitude"] is None

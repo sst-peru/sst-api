@@ -41,7 +41,7 @@ class ReportActionSerializer(serializers.ModelSerializer):
 
 
 class ReportSerializer(serializers.ModelSerializer):
-    reported_by_name = serializers.CharField(source="reported_by.get_full_name", read_only=True)
+    reported_by_name = serializers.SerializerMethodField()
     assigned_to_name = serializers.CharField(
         source="assigned_to.get_full_name", read_only=True, default=None
     )
@@ -57,11 +57,36 @@ class ReportSerializer(serializers.ModelSerializer):
             "description", "severity", "photo", "latitude", "longitude",
             "status", "assigned_to", "assigned_to_name", "closure_note",
             "reported_by", "reported_by_name", "occurred_at", "created_at", "closed_at",
-            "resolution_hours", "form_variant", "synced_offline", "actions",
+            "resolution_hours", "form_variant", "synced_offline", "is_anonymous", "actions",
         )
         read_only_fields = (
             "reported_by", "created_at", "closed_at", "resolution_hours", "actions",
+            "is_anonymous",
         )
+
+    def _es_el_autor(self, report) -> bool:
+        peticion = self.context.get("request")
+        return bool(peticion and peticion.user.id == report.reported_by_id)
+
+    def get_reported_by_name(self, report) -> str:
+        """Oculta al autor de un reporte anónimo, salvo para él mismo.
+
+        El anonimato tiene que valer también para el supervisor y el comité: si el jefe
+        del área puede ver quién lo reportó, la opción no sirve para nada.
+        """
+        if report.is_anonymous and not self._es_el_autor(report):
+            return "Anónimo"
+        return report.reported_by.get_full_name() or report.reported_by.username
+
+    def to_representation(self, instance):
+        datos = super().to_representation(instance)
+        if instance.is_anonymous and not self._es_el_autor(instance):
+            # El id del autor identifica igual que el nombre: también se va.
+            datos["reported_by"] = None
+            for accion, origen in zip(datos.get("actions", []), instance.actions.all(), strict=False):
+                if origen.author_id == instance.reported_by_id:
+                    accion["author_name"] = "Anónimo"
+        return datos
 
 
 class ReportCreateSerializer(serializers.ModelSerializer):
@@ -79,7 +104,7 @@ class ReportCreateSerializer(serializers.ModelSerializer):
         fields = (
             "client_uuid", "kind", "category", "area", "description", "severity",
             "photo", "latitude", "longitude", "occurred_at", "form_variant",
-            "synced_offline",
+            "synced_offline", "is_anonymous",
         )
         extra_kwargs = {
             "client_uuid": {"required": False},
