@@ -5,6 +5,7 @@ from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 from .views import (
     AreaViewSet,
     CompanyRegisterView,
+    CompanyView,
     MeView,
     RegisterView,
     SSTTokenObtainPairView,
@@ -22,5 +23,6 @@ urlpatterns = [
     path("refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     path("verify/", TokenVerifyView.as_view(), name="token-verify"),
     path("me/", MeView.as_view(), name="me"),
+    path("company/", CompanyView.as_view(), name="company"),
     path("", include(router.urls)),
 ]

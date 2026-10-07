@@ -8,13 +8,81 @@ from .models import Area, Company, Role
 
 User = get_user_model()
 
+# Prefijos reales de RUC en el padrón de SUNAT: 10 y 15/16/17 para persona natural con
+# negocio, 20 para persona jurídica. Cualquier otro par inicial es un error de tipeo.
+RUC_PREFIJOS = ("10", "15", "16", "17", "20")
+
+
+def validar_ruc(valor):
+    """Valida la forma de un RUC peruano y devuelve un mensaje distinto por tipo de error.
+
+    A propósito no se comprueba el dígito verificador módulo 11: dejaría fuera los RUC de
+    prueba del seed de demostración y de los tests, y la forma ya atrapa los errores de
+    tipeo que de verdad ocurren al registrarse.
+    """
+    if not valor.isdigit():
+        raise serializers.ValidationError("El RUC solo admite dígitos, sin guiones ni espacios.")
+    if len(valor) != 11:
+        raise serializers.ValidationError(
+            "El RUC debe tener exactamente 11 dígitos; escribiste %d." % len(valor)
+        )
+    if not valor.startswith(RUC_PREFIJOS):
+        raise serializers.ValidationError(
+            "Ese RUC no es válido: los RUC peruanos empiezan en 10, 15, 16, 17 o 20."
+        )
+    return valor
+
+
+def validar_dni(valor):
+    """El DNI es opcional, pero si viene tiene que tener sus 8 dígitos."""
+    if valor and (not valor.isdigit() or len(valor) != 8):
+        raise serializers.ValidationError("El DNI debe tener exactamente 8 dígitos.")
+    return valor
+
 
 class CompanySerializer(serializers.ModelSerializer):
+    """Datos de la empresa. Es también el serializer de /auth/company/, donde el
+    administrador corrige la razón social, la dirección y el número de trabajadores.
+
+    El RUC es de solo lectura: es la llave con la que los trabajadores se registran y la
+    que identifica a la empresa ante SUNAFIL. Cambiarlo dejaría a la plantilla sin poder
+    darse de alta.
+    """
+
     requires_committee = serializers.BooleanField(read_only=True)
+    worker_accounts = serializers.IntegerField(read_only=True)
+    worker_slots_available = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Company
-        fields = ("id", "name", "ruc", "address", "worker_count", "requires_committee")
+        fields = (
+            "id", "name", "ruc", "address", "worker_count",
+            "requires_committee", "worker_accounts", "worker_slots_available",
+        )
+        read_only_fields = ("ruc",)
+        extra_kwargs = {
+            "worker_count": {
+                "min_value": 1,
+                "error_messages": {
+                    "min_value": "La empresa debe tener al menos 1 trabajador.",
+                    "invalid": "El número de trabajadores debe ser un número entero.",
+                },
+            },
+        }
+
+    def validate_worker_count(self, value):
+        """No se puede declarar menos trabajadores de los que ya tienen cuenta.
+
+        Si se permitiera, las cuentas que sobran quedarían activas sin plaza y el tope
+        dejaría de significar algo.
+        """
+        registradas = self.instance.worker_accounts if self.instance else 0
+        if value < registradas:
+            raise serializers.ValidationError(
+                "Ya hay %d cuentas de trabajador registradas: no puedes declarar menos de %d. "
+                "Desactiva primero las cuentas que sobren." % (registradas, registradas)
+            )
+        return value
 
 
 class AreaSerializer(serializers.ModelSerializer):
@@ -47,7 +115,21 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True)
-    company_ruc = serializers.CharField(write_only=True, max_length=11)
+    company_ruc = serializers.CharField(
+        write_only=True,
+        max_length=11,
+        error_messages={
+            "required": "Necesitamos el RUC de tu empresa para saber a cuál te sumas.",
+            "blank": "Necesitamos el RUC de tu empresa para saber a cuál te sumas.",
+            "max_length": "El RUC debe tener exactamente 11 dígitos.",
+        },
+    )
+
+    def validate_company_ruc(self, valor):
+        return validar_ruc(valor)
+
+    def validate_dni(self, valor):
+        return validar_dni(valor)
 
     class Meta:
         model = User
@@ -68,8 +150,25 @@ class RegisterSerializer(serializers.ModelSerializer):
                 {"company_ruc": "No hay una empresa registrada con ese RUC. Pídeselo a tu supervisor."}
             ) from None
 
+        empresa = attrs["company"]
+        if not empresa.accepts_new_worker:
+            raise serializers.ValidationError(
+                {
+                    "company_ruc": (
+                        "%s declaró %d trabajador%s y ya tiene esas cuentas registradas. "
+                        "Pídele a tu administrador de SST que actualice el número de "
+                        "trabajadores de la empresa para que puedas registrarte."
+                        % (
+                            empresa.name,
+                            empresa.worker_count,
+                            "" if empresa.worker_count == 1 else "es",
+                        )
+                    )
+                }
+            )
+
         area = attrs.get("area")
-        if area and area.company_id != attrs["company"].id:
+        if area and area.company_id != empresa.id:
             raise serializers.ValidationError({"area": "El área no pertenece a esa empresa."})
         return attrs
 
@@ -92,6 +191,30 @@ class UserWriteSerializer(serializers.ModelSerializer):
             "id", "username", "email", "password", "first_name", "last_name",
             "dni", "phone", "area", "role",
         )
+
+    def validate(self, attrs):
+        """El tope de cuentas vale también para el alta manual.
+
+        Si solo se comprobara en el registro público, un manager podría pasarse el cupo
+        creando cuentas desde el panel y el número declarado no significaría nada.
+        """
+        if self.instance is None and attrs.get("role") != Role.ADMIN:
+            empresa = self.context["request"].user.company
+            if empresa and not empresa.accepts_new_worker:
+                raise serializers.ValidationError(
+                    {
+                        "role": (
+                            "Tu empresa declaró %d trabajador%s y ya tiene esas cuentas "
+                            "registradas. Sube el número de trabajadores en los datos de la "
+                            "empresa antes de crear otra cuenta."
+                            % (
+                                empresa.worker_count,
+                                "" if empresa.worker_count == 1 else "es",
+                            )
+                        )
+                    }
+                )
+        return attrs
 
     def create(self, validated_data):
         password = validated_data.pop("password")
@@ -139,10 +262,38 @@ class CompanyRegisterSerializer(serializers.Serializer):
     """
 
     # Datos de la empresa
-    name = serializers.CharField(max_length=200)
-    ruc = serializers.CharField(max_length=11)
+    name = serializers.CharField(
+        max_length=200,
+        min_length=3,
+        error_messages={
+            "required": "Escribe la razón social de la empresa.",
+            "blank": "Escribe la razón social de la empresa.",
+            "min_length": "La razón social es muy corta: necesita al menos 3 caracteres.",
+            "max_length": "La razón social no puede pasar de 200 caracteres.",
+        },
+    )
+    ruc = serializers.CharField(
+        max_length=11,
+        error_messages={
+            "required": "Escribe el RUC de la empresa.",
+            "blank": "Escribe el RUC de la empresa.",
+            "max_length": "El RUC debe tener exactamente 11 dígitos.",
+        },
+    )
     address = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
-    worker_count = serializers.IntegerField(min_value=1)
+    worker_count = serializers.IntegerField(
+        min_value=1,
+        max_value=1_000_000,
+        error_messages={
+            "required": "Indica cuántos trabajadores tiene la empresa.",
+            "invalid": "El número de trabajadores debe ser un número entero.",
+            "min_value": (
+                "La empresa debe tener al menos 1 trabajador: sin trabajadores no hay "
+                "sistema de gestión de SST que administrar."
+            ),
+            "max_value": "Revisa el número de trabajadores: 1 000 000 es el máximo admitido.",
+        },
+    )
 
     # Cuenta del administrador
     username = serializers.CharField(max_length=150)
@@ -155,8 +306,7 @@ class CompanyRegisterSerializer(serializers.Serializer):
     password_confirm = serializers.CharField(write_only=True)
 
     def validate_ruc(self, value):
-        if not value.isdigit() or len(value) != 11:
-            raise serializers.ValidationError("El RUC debe tener 11 dígitos numéricos.")
+        validar_ruc(value)
         if Company.objects.filter(ruc=value).exists():
             raise serializers.ValidationError(
                 "Ya hay una empresa registrada con ese RUC. Si trabajas ahí, "
@@ -166,8 +316,11 @@ class CompanyRegisterSerializer(serializers.Serializer):
 
     def validate_username(self, value):
         if User.objects.filter(username__iexact=value).exists():
-            raise serializers.ValidationError("Ese usuario ya está tomado.")
+            raise serializers.ValidationError("Ese usuario ya está tomado, elige otro.")
         return value
+
+    def validate_dni(self, value):
+        return validar_dni(value)
 
     def validate(self, attrs):
         if attrs["password"] != attrs.pop("password_confirm"):

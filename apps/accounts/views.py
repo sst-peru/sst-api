@@ -2,12 +2,13 @@ from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, viewsets
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied
 
 from .models import Area
 from .serializers import (
     AreaSerializer,
     CompanyRegisterSerializer,
+    CompanySerializer,
     RegisterSerializer,
     SSTTokenObtainPairSerializer,
     UserSerializer,
@@ -43,6 +44,27 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class CompanyView(generics.RetrieveUpdateAPIView):
+    """Datos de la empresa del usuario autenticado.
+
+    Leerla la puede cualquiera de la empresa —el panel muestra la razón social y el cupo
+    de cuentas—, pero escribir solo los managers: el número de trabajadores decide cuántas
+    cuentas admite el RUC y si la ley exige comité o supervisor.
+    """
+
+    serializer_class = CompanySerializer
+
+    def get_object(self):
+        empresa = self.request.user.company
+        if empresa is None:
+            raise NotFound("Tu cuenta no está asociada a ninguna empresa.")
+        if self.request.method not in permissions.SAFE_METHODS and not self.request.user.can_manage:
+            raise PermissionDenied(
+                "Solo supervisor, comité de SST o administrador puede editar los datos de la empresa."
+            )
+        return empresa
 
 
 class AreaViewSet(viewsets.ModelViewSet):

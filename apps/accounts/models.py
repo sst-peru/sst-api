@@ -24,6 +24,28 @@ class Company(models.Model):
     def requires_committee(self) -> bool:
         return self.worker_count >= 20
 
+    @property
+    def worker_accounts(self) -> int:
+        """Cuentas de trabajador ya registradas en la empresa.
+
+        El administrador no cuenta: su cuenta nace junto con la empresa y es la que
+        gestiona el sistema, no una plaza de trabajador.
+        """
+        return self.users.exclude(role=Role.ADMIN).count()
+
+    @property
+    def worker_slots_available(self) -> int:
+        return max(self.worker_count - self.worker_accounts, 0)
+
+    @property
+    def accepts_new_worker(self) -> bool:
+        """El RUC admite una cuenta más solo si quedan plazas declaradas sin usar.
+
+        Sin este tope, cualquiera con el RUC —que está en la boleta y en el cartel de
+        obra— podría abrir cuentas indefinidas en una empresa ajena.
+        """
+        return self.worker_slots_available > 0
+
 
 class Area(models.Model):
     """Área, sede o frente de trabajo donde se ubican los peligros."""
