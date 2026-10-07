@@ -7,6 +7,7 @@ from rest_framework.exceptions import PermissionDenied
 from .models import Area
 from .serializers import (
     AreaSerializer,
+    CompanyRegisterSerializer,
     RegisterSerializer,
     SSTTokenObtainPairSerializer,
     UserSerializer,
@@ -24,6 +25,17 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = (permissions.AllowAny,)
     queryset = User.objects.all()
+
+
+class CompanyRegisterView(generics.CreateAPIView):
+    """Registro de empresa: crea la empresa y la cuenta de su administrador.
+
+    Va aparte de RegisterView porque son dos altas distintas: aquí nace la empresa, allá
+    un trabajador entra a una que ya existe.
+    """
+
+    serializer_class = CompanyRegisterSerializer
+    permission_classes = (permissions.AllowAny,)
 
 
 class MeView(generics.RetrieveUpdateAPIView):

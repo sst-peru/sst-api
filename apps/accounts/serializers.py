@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -122,3 +123,86 @@ class SSTTokenObtainPairSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         data["user"] = UserSerializer(self.user).data
         return data
+
+
+class CompanyRegisterSerializer(serializers.Serializer):
+    """Alta de una empresa nueva junto con la cuenta de su administrador.
+
+    Es el otro camino de registro. En /auth/register/ el trabajador se suma a una empresa
+    que ya existe y el RUC tiene que encontrarse; aquí la empresa se crea y el RUC tiene que
+    estar libre. Son validaciones opuestas, y por eso van en endpoints separados en vez de
+    uno solo con un campo "tipo" y la mitad de los campos obligatorios a medias.
+
+    Quien registra la empresa queda como ADMIN. En ese momento no existe ningún otro
+    usuario, y alguien tiene que poder crear las áreas y las cuentas de supervisor y de
+    comité de SST que exige la Ley 29783.
+    """
+
+    # Datos de la empresa
+    name = serializers.CharField(max_length=200)
+    ruc = serializers.CharField(max_length=11)
+    address = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    worker_count = serializers.IntegerField(min_value=1)
+
+    # Cuenta del administrador
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField(required=False, allow_blank=True, default="")
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    dni = serializers.CharField(max_length=8, required=False, allow_blank=True, default="")
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    password_confirm = serializers.CharField(write_only=True)
+
+    def validate_ruc(self, value):
+        if not value.isdigit() or len(value) != 11:
+            raise serializers.ValidationError("El RUC debe tener 11 dígitos numéricos.")
+        if Company.objects.filter(ruc=value).exists():
+            raise serializers.ValidationError(
+                "Ya hay una empresa registrada con ese RUC. Si trabajas ahí, "
+                "regístrate como trabajador."
+            )
+        return value
+
+    def validate_username(self, value):
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("Ese usuario ya está tomado.")
+        return value
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs.pop("password_confirm"):
+            raise serializers.ValidationError({"password_confirm": "Las contraseñas no coinciden."})
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        """La empresa y su administrador se crean juntos o no se crean.
+
+        Sin la transacción, un error al guardar el usuario dejaría la empresa creada y su
+        RUC tomado, y el dueño no podría volver a intentarlo.
+        """
+        company = Company.objects.create(
+            name=validated_data["name"],
+            ruc=validated_data["ruc"],
+            address=validated_data["address"],
+            worker_count=validated_data["worker_count"],
+        )
+        user = User(
+            username=validated_data["username"],
+            email=validated_data["email"],
+            first_name=validated_data["first_name"],
+            last_name=validated_data["last_name"],
+            dni=validated_data["dni"],
+            phone=validated_data["phone"],
+            company=company,
+            role=Role.ADMIN,
+        )
+        user.set_password(validated_data["password"])
+        user.save()
+        return user
+
+    def to_representation(self, instance):
+        return {
+            "user": UserSerializer(instance).data,
+            "company": CompanySerializer(instance.company).data,
+        }
