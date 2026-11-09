@@ -20,7 +20,7 @@ from .models import (
 def _validar_de_la_empresa(instancia, empresa_id, campo, etiqueta):
     """Impide referenciar un objeto de otra empresa aunque se conozca su id."""
     if instancia is not None and getattr(instancia, "company_id", None) != empresa_id:
-        raise serializers.ValidationError({campo: "%s no pertenece a tu empresa." % etiqueta})
+        raise serializers.ValidationError({campo: f"{etiqueta} no pertenece a tu empresa."})
 
 
 class CorrectiveMeasureSerializer(serializers.ModelSerializer):
@@ -82,7 +82,7 @@ class InvestigationSerializer(serializers.ModelSerializer):
         model = Investigation
         fields = (
             "id", "accident", "method", "method_display", "immediate_causes", "basic_causes",
-            "root_cause", "conclusions", "participants", "performed_by", "performed_by_name",
+            "management_causes", "root_cause", "conclusions", "participants", "performed_by", "performed_by_name",
             "performed_at", "created_at",
         )
         read_only_fields = ("accident", "performed_by", "created_at")
@@ -128,7 +128,7 @@ class AccidentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Accident
         fields = (
-            "id", "client_uuid", "kind", "kind_display", "severity", "severity_display",
+            "id", "number", "client_uuid", "kind", "kind_display", "severity", "severity_display",
             "status", "status_display", "area", "area_name", "place", "description",
             "injury_description", "immediate_actions", "injured_person", "injured_name",
             "injured_dni", "injured_label", "lost_days", "origin_report",
@@ -138,7 +138,7 @@ class AccidentSerializer(serializers.ModelSerializer):
             "investigation", "measures",
         )
         read_only_fields = (
-            "status", "reported_by", "created_at", "closed_at",
+            "number", "status", "reported_by", "created_at", "closed_at",
             "mtpe_notified_at", "mtpe_notice_code",
         )
 
@@ -261,7 +261,8 @@ class OccupationalDiseaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = OccupationalDisease
         fields = (
-            "id", "worker", "worker_name", "worker_label", "area", "area_name", "diagnosis",
+            "id", "worker", "worker_name", "worker_label", "area", "area_name", "job_position",
+            "diagnosis",
             "cie10_code", "causal_agent", "exposure_months", "diagnosed_on", "status",
             "status_display", "rest_days", "notes", "reported_by", "created_at",
         )

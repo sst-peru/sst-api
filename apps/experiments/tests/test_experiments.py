@@ -43,7 +43,7 @@ def poblar(experimento, empresa, variante, reportes_por_usuario):
     """Crea un usuario por entrada y le asigna la variante con esa cantidad de reportes."""
     for indice, cantidad in enumerate(reportes_por_usuario):
         user = User.objects.create_user(
-            username="%s%d" % (variante, indice), password="x",
+            username=f"{variante}{indice}", password="x",
             company=empresa, role=Role.OPERARIO,
         )
         Assignment.objects.create(experiment=experimento, user=user, variant=variante)

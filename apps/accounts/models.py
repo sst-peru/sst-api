@@ -159,4 +159,4 @@ class PrivacyConsent(models.Model):
         ordering = ("-granted_at",)
 
     def __str__(self) -> str:
-        return "%s · %s" % (self.user, self.policy_version)
+        return f"{self.user} · {self.policy_version}"

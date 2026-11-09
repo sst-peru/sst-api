@@ -9,7 +9,7 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 # Artículo 82 de la Ley N° 29783: el empleador notifica al Ministerio de Trabajo los
@@ -47,6 +47,10 @@ class Accident(models.Model):
     company = models.ForeignKey(
         "accounts.Company", on_delete=models.CASCADE, related_name="accidents"
     )
+    # Número correlativo dentro de la empresa. El registro obligatorio de accidentes se lleva
+    # numerado: es la referencia que se cita en el aviso al MTPE y ante una fiscalización, y
+    # el id interno no sirve porque es global y salta entre empresas.
+    number = models.PositiveIntegerField("número correlativo", editable=False)
     kind = models.CharField("tipo", max_length=20, choices=AccidentKind.choices)
     severity = models.CharField(
         "gravedad", max_length=15, choices=AccidentSeverity.choices,
@@ -104,9 +108,33 @@ class Accident(models.Model):
             models.Index(fields=("company", "status")),
             models.Index(fields=("company", "-occurred_at")),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("company", "number"), name="accident_number_unique_per_company"
+            ),
+        ]
 
     def __str__(self) -> str:
-        return "%s del %s" % (self.get_kind_display(), self.occurred_at.date())
+        return f"{self.get_kind_display()} N° {self.number} del {self.occurred_at.date()}"
+
+    def save(self, *args, **kwargs):
+        """Asigna el siguiente correlativo de la empresa al registrar el accidente.
+
+        Se bloquea la fila de la empresa mientras se calcula, para que dos registros
+        simultáneos no obtengan el mismo número.
+        """
+        if self.number is None:
+            from apps.accounts.models import Company
+
+            with transaction.atomic():
+                Company.objects.select_for_update().filter(pk=self.company_id).first()
+                ultimo = (
+                    Accident.objects.filter(company_id=self.company_id)
+                    .aggregate(models.Max("number"))["number__max"]
+                )
+                self.number = (ultimo or 0) + 1
+                return super().save(*args, **kwargs)
+        return super().save(*args, **kwargs)
 
     @property
     def injured_label(self) -> str:
@@ -161,8 +189,8 @@ class InvestigationMethod(models.TextChoices):
 class Investigation(models.Model):
     """Investigación del accidente. Uno a uno: un accidente se investiga una vez.
 
-    Se separan causas inmediatas, causas básicas y causa raíz porque es la estructura que
-    pide el registro oficial: quedarse en la causa inmediata —«el trabajador se distrajo»—
+    Se separan causas inmediatas, causas básicas, causas de gestión y causa raíz porque es la
+    estructura que pide el registro oficial: quedarse en la causa inmediata —«el trabajador se distrajo»—
     es justo lo que la fiscalización observa.
     """
 
@@ -175,6 +203,9 @@ class Investigation(models.Model):
     )
     immediate_causes = models.TextField("causas inmediatas", blank=True)
     basic_causes = models.TextField("causas básicas", blank=True)
+    # Fallas del propio sistema de gestión: procedimiento inexistente, capacitación no
+    # dada, supervisión ausente. Son las que la empresa puede corregir de raíz.
+    management_causes = models.TextField("causas de gestión", blank=True)
     root_cause = models.TextField("causa raíz")
     conclusions = models.TextField("conclusiones", blank=True)
     participants = models.CharField("participantes", max_length=255, blank=True)
@@ -190,7 +221,7 @@ class Investigation(models.Model):
         verbose_name_plural = "investigaciones"
 
     def __str__(self) -> str:
-        return "Investigación de %s" % self.accident
+        return f"Investigación de {self.accident}"
 
 
 class ControlKind(models.TextChoices):
@@ -286,6 +317,9 @@ class OccupationalDisease(models.Model):
         "accounts.Area", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="occupational_diseases",
     )
+    # El registro asocia la enfermedad al puesto porque la exposición depende de la tarea,
+    # no solo del área: en una misma área el soldador y el almacenero respiran cosas distintas.
+    job_position = models.CharField("puesto de trabajo", max_length=120, blank=True)
     diagnosis = models.CharField("diagnóstico", max_length=200)
     cie10_code = models.CharField("código CIE-10", max_length=10, blank=True)
     causal_agent = models.CharField("agente causal", max_length=150, blank=True)
@@ -309,7 +343,7 @@ class OccupationalDisease(models.Model):
         ordering = ("-diagnosed_on",)
 
     def __str__(self) -> str:
-        return "%s (%s)" % (self.diagnosis, self.diagnosed_on)
+        return f"{self.diagnosis} ({self.diagnosed_on})"
 
     @property
     def worker_label(self) -> str:

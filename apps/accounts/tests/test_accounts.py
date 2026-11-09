@@ -386,7 +386,7 @@ def test_el_ruc_admite_exactamente_las_cuentas_declaradas(db, declarados):
     empresa = Company.objects.create(name="Tope SAC", ruc="20700000001", worker_count=declarados)
 
     for n in range(declarados):
-        assert registrar_trabajador(empresa.ruc, "t%d" % n).status_code == 201
+        assert registrar_trabajador(empresa.ruc, f"t{n}").status_code == 201
 
     sobrante = registrar_trabajador(empresa.ruc, "sobrante")
     assert sobrante.status_code == 400

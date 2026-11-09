@@ -114,6 +114,36 @@ def test_el_registro_es_idempotente_por_client_uuid(operario):
     assert Accident.objects.count() == 1
 
 
+def test_cada_accidente_recibe_el_siguiente_correlativo_de_su_empresa(operario, otra_empresa):
+    """El registro obligatorio se lleva numerado, y la numeración es propia de cada empresa."""
+    primero = crear_accidente(operario)
+    segundo = crear_accidente(operario)
+    ajeno = User.objects.create_user(
+        username="ajeno", password="x", company=otra_empresa, role=Role.OPERARIO
+    )
+    de_otra_empresa = crear_accidente(ajeno)
+
+    assert primero.data["number"] == 1
+    assert segundo.data["number"] == 2
+    assert de_otra_empresa.data["number"] == 1
+
+
+def test_el_correlativo_no_se_puede_fijar_desde_el_cliente(operario):
+    response = crear_accidente(operario, number=99)
+
+    assert response.status_code == 201
+    assert response.data["number"] == 1
+
+
+def test_un_reintento_no_consume_un_correlativo(operario):
+    uuid = "5d2f7b3a-0000-4000-8000-000000000002"
+    crear_accidente(operario, client_uuid=uuid)
+    crear_accidente(operario, client_uuid=uuid)
+    siguiente = crear_accidente(operario)
+
+    assert siguiente.data["number"] == 2
+
+
 def test_no_se_admite_un_accidente_con_fecha_futura(operario):
     response = crear_accidente(operario, occurred_at=(timezone.now() + timedelta(days=1)).isoformat())
 
@@ -328,6 +358,25 @@ def test_la_investigacion_pasa_el_accidente_a_en_investigacion(supervisor, opera
     assert response.data["status"] == AccidentStatus.EN_INVESTIGACION
     assert response.data["investigation"]["root_cause"].startswith("Falta de línea")
     assert response.data["investigation"]["performed_by"] == supervisor.id
+
+
+def test_la_investigacion_registra_las_causas_de_gestion(supervisor, operario):
+    """Inmediatas, básicas y de gestión: la estructura completa del registro oficial."""
+    crear_accidente(operario)
+    accidente = Accident.objects.get()
+
+    response = investigar(
+        supervisor,
+        accidente,
+        immediate_causes="Andamio sin anclaje.",
+        basic_causes="Trabajador sin capacitación en trabajo en altura.",
+        management_causes="No existe procedimiento escrito de trabajo en altura.",
+    )
+
+    assert response.status_code == 200
+    investigacion = response.data["investigation"]
+    assert investigacion["management_causes"].startswith("No existe procedimiento")
+    assert investigacion["basic_causes"].startswith("Trabajador sin capacitación")
 
 
 def test_la_investigacion_exige_causa_raiz(supervisor, operario):
@@ -558,6 +607,18 @@ def test_un_manager_registra_una_enfermedad_ocupacional(supervisor):
     assert enfermedad.company_id == supervisor.company_id
     assert enfermedad.reported_by_id == supervisor.id
     assert response.data["worker_label"] == "Rosa Flores"
+
+
+def test_la_enfermedad_queda_asociada_al_puesto_y_al_agente(supervisor):
+    response = cliente(supervisor).post(
+        reverse("occupational-disease-list"),
+        datos_enfermedad(job_position="Operador de amoladora"),
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert response.data["job_position"] == "Operador de amoladora"
+    assert response.data["causal_agent"] == "Ruido continuo sobre 85 dB"
 
 
 def test_el_operario_no_accede_al_registro_de_enfermedades(operario):

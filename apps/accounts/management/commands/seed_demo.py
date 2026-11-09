@@ -21,8 +21,8 @@ from apps.committee.models import (
     AgreementStatus,
     Committee,
     CommitteeMember,
-    MemberRole,
     Meeting,
+    MemberRole,
     Represents,
 )
 from apps.epp.models import EppDelivery, EppItem
