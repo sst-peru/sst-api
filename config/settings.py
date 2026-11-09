@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "apps.experiments",
     "apps.committee",
     "apps.exports",
+    "apps.training",
 ]
 
 MIDDLEWARE = [
@@ -209,6 +210,14 @@ SPECTACULAR_SETTINGS = {
             "description": (
                 "Programación de inspecciones por área y frecuencia, y su ejecución con "
                 "checklist."
+            ),
+        },
+        {
+            "name": "Capacitación y simulacros",
+            "description": (
+                "Programa anual de capacitación con su asistencia, inducción del personal "
+                "nuevo, alerta de capacitación vencida y registro de simulacros de "
+                "emergencia: los registros de formación del artículo 33 de la ley."
             ),
         },
         {
