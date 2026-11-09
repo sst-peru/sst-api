@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "apps.training",
     "apps.riskmap",
     "apps.documents",
+    "apps.monitoring",
 ]
 
 MIDDLEWARE = [
@@ -126,6 +127,7 @@ REST_FRAMEWORK = {
         "user": config("THROTTLE_USER", default="600/min"),
         # El inicio de sesión aparte y más estricto: es el blanco de quien prueba contraseñas.
         "login": config("THROTTLE_LOGIN", default="10/min"),
+        "client_errors": config("THROTTLE_CLIENT_ERRORS", default="30/min"),
     },
 }
 
