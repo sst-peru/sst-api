@@ -157,9 +157,9 @@ class AccidentViewSet(_ManagerWriteMixin, viewsets.ModelViewSet):
             raise ValidationError(
                 {
                     "detail": (
-                        "Quedan %d medidas correctivas sin verificar. Cerrar el expediente "
-                        "con medidas abiertas es lo que convierte un accidente en reincidente."
-                        % pendientes
+                        f"Quedan {pendientes} medidas correctivas sin verificar. Cerrar el "
+                        "expediente con medidas abiertas es lo que convierte un accidente en "
+                        "reincidente."
                     )
                 }
             )

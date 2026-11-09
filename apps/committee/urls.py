@@ -5,9 +5,9 @@ from .views import (
     AgreementViewSet,
     CommitteeComplianceView,
     CommitteeMemberViewSet,
+    CommitteeViewSet,
     MeetingViewSet,
 )
-from .views import CommitteeViewSet
 
 router = DefaultRouter()
 router.register("committee/members", CommitteeMemberViewSet, basename="committee-member")

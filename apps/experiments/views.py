@@ -179,9 +179,8 @@ class ExperimentResultsView(APIView):
             lectura = "Sin variación entre sujetos no se puede estimar el error."
         elif concluyente:
             lectura = (
-                "La diferencia es distinguible del azar con 95 %% de confianza: la variante "
-                "«%s» registra entre %.2f y %.2f reportes por usuario %s que «%s»."
-                % (
+                "La diferencia es distinguible del azar con 95 % de confianza: la variante "
+                "«{}» registra entre {:.2f} y {:.2f} reportes por usuario {} que «{}».".format(
                     a["variant"],
                     abs(min(abs(bajo), abs(alto))),
                     abs(max(abs(bajo), abs(alto))),

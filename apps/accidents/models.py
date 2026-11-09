@@ -221,7 +221,7 @@ class Investigation(models.Model):
         verbose_name_plural = "investigaciones"
 
     def __str__(self) -> str:
-        return "Investigación de %s" % self.accident
+        return f"Investigación de {self.accident}"
 
 
 class ControlKind(models.TextChoices):
@@ -343,7 +343,7 @@ class OccupationalDisease(models.Model):
         ordering = ("-diagnosed_on",)
 
     def __str__(self) -> str:
-        return "%s (%s)" % (self.diagnosis, self.diagnosed_on)
+        return f"{self.diagnosis} ({self.diagnosed_on})"
 
     @property
     def worker_label(self) -> str:

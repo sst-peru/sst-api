@@ -24,7 +24,7 @@ def validar_ruc(valor):
         raise serializers.ValidationError("El RUC solo admite dígitos, sin guiones ni espacios.")
     if len(valor) != 11:
         raise serializers.ValidationError(
-            "El RUC debe tener exactamente 11 dígitos; escribiste %d." % len(valor)
+            f"El RUC debe tener exactamente 11 dígitos; escribiste {len(valor)}."
         )
     if not valor.startswith(RUC_PREFIJOS):
         raise serializers.ValidationError(
@@ -79,8 +79,8 @@ class CompanySerializer(serializers.ModelSerializer):
         registradas = self.instance.worker_accounts if self.instance else 0
         if value < registradas:
             raise serializers.ValidationError(
-                "Ya hay %d cuentas de trabajador registradas: no puedes declarar menos de %d. "
-                "Desactiva primero las cuentas que sobren." % (registradas, registradas)
+                f"Ya hay {registradas} cuentas de trabajador registradas: no puedes declarar "
+                f"menos de {registradas}. Desactiva primero las cuentas que sobren."
             )
         return value
 
@@ -160,14 +160,11 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {
                     "company_ruc": (
-                        "%s declaró %d trabajador%s y ya tiene esas cuentas registradas. "
-                        "Pídele a tu administrador de SST que actualice el número de "
-                        "trabajadores de la empresa para que puedas registrarte."
-                        % (
-                            empresa.name,
-                            empresa.worker_count,
-                            "" if empresa.worker_count == 1 else "es",
-                        )
+                        f"{empresa.name} declaró {empresa.worker_count} "
+                        f"trabajador{'' if empresa.worker_count == 1 else 'es'} y ya tiene "
+                        "esas cuentas registradas. Pídele a tu administrador de SST que "
+                        "actualice el número de trabajadores de la empresa para que puedas "
+                        "registrarte."
                     )
                 }
             )
@@ -209,13 +206,10 @@ class UserWriteSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {
                         "role": (
-                            "Tu empresa declaró %d trabajador%s y ya tiene esas cuentas "
-                            "registradas. Sube el número de trabajadores en los datos de la "
-                            "empresa antes de crear otra cuenta."
-                            % (
-                                empresa.worker_count,
-                                "" if empresa.worker_count == 1 else "es",
-                            )
+                            f"Tu empresa declaró {empresa.worker_count} "
+                            f"trabajador{'' if empresa.worker_count == 1 else 'es'} y ya "
+                            "tiene esas cuentas registradas. Sube el número de trabajadores "
+                            "en los datos de la empresa antes de crear otra cuenta."
                         )
                     }
                 )
@@ -419,7 +413,7 @@ class PrivacyConsentWriteSerializer(serializers.Serializer):
         """
         if value != POLITICA_PRIVACIDAD_VERSION:
             raise serializers.ValidationError(
-                "La política vigente es la versión %s. Vuelve a cargar la página para "
-                "leerla antes de aceptarla." % POLITICA_PRIVACIDAD_VERSION
+                f"La política vigente es la versión {POLITICA_PRIVACIDAD_VERSION}. "
+                "Vuelve a cargar la página para leerla antes de aceptarla."
             )
         return value

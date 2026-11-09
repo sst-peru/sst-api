@@ -20,7 +20,7 @@ from .models import (
 def _validar_de_la_empresa(instancia, empresa_id, campo, etiqueta):
     """Impide referenciar un objeto de otra empresa aunque se conozca su id."""
     if instancia is not None and getattr(instancia, "company_id", None) != empresa_id:
-        raise serializers.ValidationError({campo: "%s no pertenece a tu empresa." % etiqueta})
+        raise serializers.ValidationError({campo: f"{etiqueta} no pertenece a tu empresa."})
 
 
 class CorrectiveMeasureSerializer(serializers.ModelSerializer):
