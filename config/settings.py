@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "apps.committee",
     "apps.exports",
     "apps.training",
+    "apps.riskmap",
 ]
 
 MIDDLEWARE = [
@@ -218,6 +219,12 @@ SPECTACULAR_SETTINGS = {
                 "Programa anual de capacitación con su asistencia, inducción del personal "
                 "nuevo, alerta de capacitación vencida y registro de simulacros de "
                 "emergencia: los registros de formación del artículo 33 de la ley."
+            ),
+        },
+        {
+            "name": "Mapa de riesgos y señalización",
+            "description": (
+                "Mapa de riesgos de cada área con los peligros ubicados sobre el plano, e inventario de la señalización de seguridad con su estado."
             ),
         },
         {
