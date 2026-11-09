@@ -261,7 +261,8 @@ class OccupationalDiseaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = OccupationalDisease
         fields = (
-            "id", "worker", "worker_name", "worker_label", "area", "area_name", "diagnosis",
+            "id", "worker", "worker_name", "worker_label", "area", "area_name", "job_position",
+            "diagnosis",
             "cie10_code", "causal_agent", "exposure_months", "diagnosed_on", "status",
             "status_display", "rest_days", "notes", "reported_by", "created_at",
         )

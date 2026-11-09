@@ -609,6 +609,18 @@ def test_un_manager_registra_una_enfermedad_ocupacional(supervisor):
     assert response.data["worker_label"] == "Rosa Flores"
 
 
+def test_la_enfermedad_queda_asociada_al_puesto_y_al_agente(supervisor):
+    response = cliente(supervisor).post(
+        reverse("occupational-disease-list"),
+        datos_enfermedad(job_position="Operador de amoladora"),
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert response.data["job_position"] == "Operador de amoladora"
+    assert response.data["causal_agent"] == "Ruido continuo sobre 85 dB"
+
+
 def test_el_operario_no_accede_al_registro_de_enfermedades(operario):
     """Es dato de salud de sus compañeros."""
     response = cliente(operario).get(reverse("occupational-disease-list"))

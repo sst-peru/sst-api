@@ -317,6 +317,9 @@ class OccupationalDisease(models.Model):
         "accounts.Area", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="occupational_diseases",
     )
+    # El registro asocia la enfermedad al puesto porque la exposición depende de la tarea,
+    # no solo del área: en una misma área el soldador y el almacenero respiran cosas distintas.
+    job_position = models.CharField("puesto de trabajo", max_length=120, blank=True)
     diagnosis = models.CharField("diagnóstico", max_length=200)
     cie10_code = models.CharField("código CIE-10", max_length=10, blank=True)
     causal_agent = models.CharField("agente causal", max_length=150, blank=True)
