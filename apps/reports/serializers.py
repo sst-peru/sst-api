@@ -49,6 +49,7 @@ class ReportSerializer(serializers.ModelSerializer):
     area_name = serializers.CharField(source="area.name", read_only=True, default=None)
     actions = ReportActionSerializer(many=True, read_only=True)
     resolution_hours = serializers.FloatField(read_only=True)
+    source_inspection_label = serializers.SerializerMethodField()
 
     class Meta:
         model = Report
@@ -58,11 +59,18 @@ class ReportSerializer(serializers.ModelSerializer):
             "status", "assigned_to", "assigned_to_name", "closure_note",
             "reported_by", "reported_by_name", "occurred_at", "created_at", "closed_at",
             "resolution_hours", "form_variant", "synced_offline", "is_anonymous", "actions",
+            "source_inspection", "source_inspection_label",
         )
         read_only_fields = (
             "reported_by", "created_at", "closed_at", "resolution_hours", "actions",
-            "is_anonymous",
+            "is_anonymous", "source_inspection",
         )
+
+    def get_source_inspection_label(self, report) -> str | None:
+        inspeccion = report.source_inspection
+        if inspeccion is None:
+            return None
+        return f"{inspeccion.schedule.title} del {inspeccion.due_date:%d/%m/%Y}"
 
     def _es_el_autor(self, report) -> bool:
         peticion = self.context.get("request")

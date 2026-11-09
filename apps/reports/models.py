@@ -105,6 +105,13 @@ class Report(models.Model):
     # un costo que la mayoria no esta dispuesta a pagar, y el peligro no se reporta.
     is_anonymous = models.BooleanField("reporte anónimo", default=False)
 
+    # Inspección de la que salió el hallazgo, si se generó desde una observación del
+    # checklist: así el hallazgo entra al ciclo de corrección sin perder su origen.
+    source_inspection = models.ForeignKey(
+        "inspections.Inspection", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="generated_reports", verbose_name="inspección de origen",
+    )
+
     class Meta:
         verbose_name = "reporte"
         verbose_name_plural = "reportes"
