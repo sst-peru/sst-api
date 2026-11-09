@@ -103,6 +103,41 @@ MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Almacenamiento de archivos (TS22). Con un bucket configurado, las fotos, planos y documentos
+# van a un servicio de objetos compatible con S3 (AWS S3, Cloudflare R2, MinIO) y el API
+# entrega enlaces firmados que vencen; sin bucket, se guardan en disco, como en desarrollo.
+AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME", default="")
+if AWS_STORAGE_BUCKET_NAME:
+    _ALMACENAMIENTO_ARCHIVOS = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": AWS_STORAGE_BUCKET_NAME,
+            "access_key": config("AWS_ACCESS_KEY_ID", default=""),
+            "secret_key": config("AWS_SECRET_ACCESS_KEY", default=""),
+            "region_name": config("AWS_S3_REGION_NAME", default="us-east-1"),
+            "endpoint_url": config("AWS_S3_ENDPOINT_URL", default="") or None,
+            # Bucket privado: cada enlace va firmado y vence, nunca es público.
+            "default_acl": None,
+            "querystring_auth": True,
+            "signature_version": "s3v4",
+            "querystring_expire": config("AWS_QUERYSTRING_EXPIRE", default=3600, cast=int),
+            "file_overwrite": False,
+        },
+    }
+else:
+    _ALMACENAMIENTO_ARCHIVOS = {"BACKEND": "django.core.files.storage.FileSystemStorage"}
+
+STORAGES = {
+    "default": _ALMACENAMIENTO_ARCHIVOS,
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
+# Respaldos (TS21): la copia se cifra con esta clave Fernet antes de guardarse. Sin ella, el
+# comando de respaldo se niega a correr: un respaldo sin cifrar del expediente de SST es un
+# riesgo mayor que no tenerlo.
+BACKUP_ENCRYPTION_KEY = config("BACKUP_ENCRYPTION_KEY", default="")
+BACKUP_RETENTION = config("BACKUP_RETENTION", default=14, cast=int)
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",

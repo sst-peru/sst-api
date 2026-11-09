@@ -39,3 +39,27 @@ class ClientError(models.Model):
 
     def __str__(self) -> str:
         return f"[{self.platform} {self.app_version}] {self.message[:80]}"
+
+
+class BackupKind(models.TextChoices):
+    RESPALDO = "RESPALDO", "Respaldo"
+    PRUEBA = "PRUEBA", "Prueba de restauración"
+
+
+class BackupLog(models.Model):
+    """Constancia de cada respaldo y de cada prueba de restauración (TS21)."""
+
+    kind = models.CharField("tipo", max_length=10, choices=BackupKind.choices)
+    ok = models.BooleanField("exitoso")
+    file = models.CharField("archivo", max_length=255, blank=True)
+    detail = models.TextField("detalle", blank=True)
+    created_at = models.DateTimeField("fecha", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "registro de respaldo"
+        verbose_name_plural = "registros de respaldo"
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        estado = "OK" if self.ok else "FALLÓ"
+        return f"{self.get_kind_display()} {self.created_at:%Y-%m-%d %H:%M} {estado}"
