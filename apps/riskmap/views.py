@@ -5,6 +5,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -70,12 +71,19 @@ class RiskMapViewSet(viewsets.ModelViewSet):
         return Response(RiskMarkerSerializer(mapa.markers.all(), many=True).data)
 
 
+class PaginaDeInventario(PageNumberPagination):
+    """El inventario se revisa completo, área por área: 20 por página lo partiría sin sentido."""
+
+    page_size = 200
+
+
 @extend_schema(tags=[ETIQUETA])
 class SafetySignViewSet(viewsets.ModelViewSet):
     """Inventario de señalización por área (US87)."""
 
     serializer_class = SafetySignSerializer
     permission_classes = (ManagerEscribe,)
+    pagination_class = PaginaDeInventario
     filterset_fields = ("area", "kind", "status")
 
     def get_queryset(self):
