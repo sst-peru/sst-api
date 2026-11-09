@@ -39,6 +39,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Primero, para que el identificador de correlación cubra toda la petición.
+    "config.observability.RequestLogMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -112,6 +114,19 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Límite de tasa (TS25): un cliente defectuoso que reintenta en bucle no puede degradar el
+    # servicio de las demás empresas. Al pasarlo, el API responde 429 con Retry-After.
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": config("THROTTLE_ANON", default="60/min"),
+        "user": config("THROTTLE_USER", default="600/min"),
+        # El inicio de sesión aparte y más estricto: es el blanco de quien prueba contraseñas.
+        "login": config("THROTTLE_LOGIN", default="10/min"),
+    },
 }
 
 from datetime import timedelta  # noqa: E402
@@ -289,3 +304,24 @@ SPECTACULAR_SETTINGS = {
 }
 
 CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="http://localhost:5173", cast=Csv())
+# El cliente puede leer el identificador de correlación para mostrarlo al reportar un error.
+CORS_EXPOSE_HEADERS = ["X-Request-ID", "Retry-After"]
+
+# Registros estructurados (TS23): JSON por línea con el identificador de la petición.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {"request_id": {"()": "config.observability.RequestIdFilter"}},
+    "formatters": {"json": {"()": "config.observability.JsonFormatter"}},
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "filters": ["request_id"],
+        },
+    },
+    "loggers": {
+        "sst": {"handlers": ["console"], "level": config("LOG_LEVEL", default="INFO")},
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+    },
+}
