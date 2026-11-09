@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "apps.exports",
     "apps.training",
     "apps.riskmap",
+    "apps.documents",
 ]
 
 MIDDLEWARE = [
@@ -225,6 +226,12 @@ SPECTACULAR_SETTINGS = {
             "name": "Mapa de riesgos y señalización",
             "description": (
                 "Mapa de riesgos de cada área con los peligros ubicados sobre el plano, e inventario de la señalización de seguridad con su estado."
+            ),
+        },
+        {
+            "name": "Documentos y plan anual del SGSST",
+            "description": (
+                "Política de SST, Reglamento Interno con la constancia de entrega a cada trabajador, control de versiones de los documentos y plan anual de SST con su avance."
             ),
         },
         {
