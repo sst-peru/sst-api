@@ -114,6 +114,36 @@ def test_el_registro_es_idempotente_por_client_uuid(operario):
     assert Accident.objects.count() == 1
 
 
+def test_cada_accidente_recibe_el_siguiente_correlativo_de_su_empresa(operario, otra_empresa):
+    """El registro obligatorio se lleva numerado, y la numeración es propia de cada empresa."""
+    primero = crear_accidente(operario)
+    segundo = crear_accidente(operario)
+    ajeno = User.objects.create_user(
+        username="ajeno", password="x", company=otra_empresa, role=Role.OPERARIO
+    )
+    de_otra_empresa = crear_accidente(ajeno)
+
+    assert primero.data["number"] == 1
+    assert segundo.data["number"] == 2
+    assert de_otra_empresa.data["number"] == 1
+
+
+def test_el_correlativo_no_se_puede_fijar_desde_el_cliente(operario):
+    response = crear_accidente(operario, number=99)
+
+    assert response.status_code == 201
+    assert response.data["number"] == 1
+
+
+def test_un_reintento_no_consume_un_correlativo(operario):
+    uuid = "5d2f7b3a-0000-4000-8000-000000000002"
+    crear_accidente(operario, client_uuid=uuid)
+    crear_accidente(operario, client_uuid=uuid)
+    siguiente = crear_accidente(operario)
+
+    assert siguiente.data["number"] == 2
+
+
 def test_no_se_admite_un_accidente_con_fecha_futura(operario):
     response = crear_accidente(operario, occurred_at=(timezone.now() + timedelta(days=1)).isoformat())
 

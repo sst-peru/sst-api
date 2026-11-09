@@ -128,7 +128,7 @@ class AccidentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Accident
         fields = (
-            "id", "client_uuid", "kind", "kind_display", "severity", "severity_display",
+            "id", "number", "client_uuid", "kind", "kind_display", "severity", "severity_display",
             "status", "status_display", "area", "area_name", "place", "description",
             "injury_description", "immediate_actions", "injured_person", "injured_name",
             "injured_dni", "injured_label", "lost_days", "origin_report",
@@ -138,7 +138,7 @@ class AccidentSerializer(serializers.ModelSerializer):
             "investigation", "measures",
         )
         read_only_fields = (
-            "status", "reported_by", "created_at", "closed_at",
+            "number", "status", "reported_by", "created_at", "closed_at",
             "mtpe_notified_at", "mtpe_notice_code",
         )
 

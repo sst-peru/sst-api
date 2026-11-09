@@ -9,7 +9,7 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 # Artículo 82 de la Ley N° 29783: el empleador notifica al Ministerio de Trabajo los
@@ -47,6 +47,10 @@ class Accident(models.Model):
     company = models.ForeignKey(
         "accounts.Company", on_delete=models.CASCADE, related_name="accidents"
     )
+    # Número correlativo dentro de la empresa. El registro obligatorio de accidentes se lleva
+    # numerado: es la referencia que se cita en el aviso al MTPE y ante una fiscalización, y
+    # el id interno no sirve porque es global y salta entre empresas.
+    number = models.PositiveIntegerField("número correlativo", editable=False)
     kind = models.CharField("tipo", max_length=20, choices=AccidentKind.choices)
     severity = models.CharField(
         "gravedad", max_length=15, choices=AccidentSeverity.choices,
@@ -104,9 +108,33 @@ class Accident(models.Model):
             models.Index(fields=("company", "status")),
             models.Index(fields=("company", "-occurred_at")),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("company", "number"), name="accident_number_unique_per_company"
+            ),
+        ]
 
     def __str__(self) -> str:
-        return "%s del %s" % (self.get_kind_display(), self.occurred_at.date())
+        return f"{self.get_kind_display()} N° {self.number} del {self.occurred_at.date()}"
+
+    def save(self, *args, **kwargs):
+        """Asigna el siguiente correlativo de la empresa al registrar el accidente.
+
+        Se bloquea la fila de la empresa mientras se calcula, para que dos registros
+        simultáneos no obtengan el mismo número.
+        """
+        if self.number is None:
+            from apps.accounts.models import Company
+
+            with transaction.atomic():
+                Company.objects.select_for_update().filter(pk=self.company_id).first()
+                ultimo = (
+                    Accident.objects.filter(company_id=self.company_id)
+                    .aggregate(models.Max("number"))["number__max"]
+                )
+                self.number = (ultimo or 0) + 1
+                return super().save(*args, **kwargs)
+        return super().save(*args, **kwargs)
 
     @property
     def injured_label(self) -> str:
