@@ -1,15 +1,24 @@
 from datetime import timedelta
 
+from django.db import transaction
 from django.db.models import Count, F, Q
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.reports.models import Report, ReportAction, ReportKind
+from apps.reports.serializers import ReportSerializer
+
 from .models import Inspection, InspectionSchedule, InspectionStatus
-from .serializers import InspectionScheduleSerializer, InspectionSerializer
+from .serializers import (
+    GenerateReportSerializer,
+    InspectionScheduleSerializer,
+    InspectionSerializer,
+)
 
 
 @extend_schema(tags=["Inspecciones periódicas"])
@@ -51,6 +60,46 @@ class InspectionViewSet(viewsets.ModelViewSet):
         inspection.results = request.data.get("results", inspection.results)
         inspection.save()
         return Response(InspectionSerializer(inspection).data)
+
+    @extend_schema(request=GenerateReportSerializer, responses=ReportSerializer)
+    @action(detail=True, methods=["post"], url_path="generate-report")
+    def generate_report(self, request, pk=None):
+        """Convierte una observación de la inspección en un hallazgo (US120).
+
+        El hallazgo nace como condición insegura del área inspeccionada, queda enlazado a la
+        inspección y entra al mismo ciclo de asignación y cierre que un reporte de campo.
+        """
+        inspection = self.get_object()
+        if inspection.status != InspectionStatus.REALIZADA:
+            raise ValidationError(
+                {"detail": "Primero registra la inspección como realizada."}
+            )
+        datos = GenerateReportSerializer(data=request.data)
+        datos.is_valid(raise_exception=True)
+        item = datos.validated_data.get("item", "").strip()
+        descripcion = datos.validated_data["description"].strip()
+        if item:
+            descripcion = f"[{item}] {descripcion}"
+        with transaction.atomic():
+            reporte = Report.objects.create(
+                company=request.user.company,
+                reported_by=request.user,
+                kind=ReportKind.CONDICION,
+                area=inspection.schedule.area,
+                description=descripcion,
+                severity=datos.validated_data["severity"],
+                occurred_at=inspection.performed_at or timezone.now(),
+                source_inspection=inspection,
+            )
+            ReportAction.objects.create(
+                report=reporte,
+                author=request.user,
+                note=f"Hallazgo generado desde la inspección «{inspection.schedule.title}».",
+                new_status=reporte.status,
+            )
+        return Response(
+            ReportSerializer(reporte, context={"request": request}).data, status=201
+        )
 
 
 @extend_schema(tags=["Indicadores del SGSST"])
