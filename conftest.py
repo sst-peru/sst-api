@@ -22,3 +22,13 @@ def _contrasenas_rapidas():
         PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"]
     ):
         yield
+
+
+@pytest.fixture(autouse=True)
+def _contadores_de_tasa_limpios():
+    """El límite de tasa cuenta en la caché: sin limpiarla, un test heredaría las peticiones
+    de los anteriores y recibiría un 429 que no tiene que ver con lo que prueba."""
+    from django.core.cache import cache
+
+    cache.clear()
+    yield

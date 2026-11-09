@@ -30,6 +30,8 @@ User = get_user_model()
 @extend_schema(tags=["Autenticación y sesión"])
 class SSTTokenObtainPairView(TokenObtainPairView):
     serializer_class = SSTTokenObtainPairSerializer
+    # Límite propio y más estricto que el general: frena a quien prueba contraseñas.
+    throttle_scope = "login"
 
 
 @extend_schema(tags=["Autenticación y sesión"])
