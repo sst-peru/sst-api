@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "apps.riskmap",
     "apps.documents",
     "apps.monitoring",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [
@@ -308,6 +309,24 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="http://localhost:5173", cast=Csv())
 # El cliente puede leer el identificador de correlación para mostrarlo al reportar un error.
 CORS_EXPOSE_HEADERS = ["X-Request-ID", "Retry-After"]
+
+# Correo transaccional (TS19). Sin configurar, los correos salen por consola: sirve en
+# desarrollo y no envía nada por error. En producción basta definir el backend SMTP y sus
+# credenciales en el entorno (o el backend del proveedor que se use).
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_HOST = config("EMAIL_HOST", default="")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="Resguardo <no-responder@resguardo.pe>")
+# Dirección de la web: los enlaces de los correos apuntan ahí.
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
+# El enlace para restablecer la contraseña vale un día.
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
 
 # Registros estructurados (TS23): JSON por línea con el identificador de la petición.
 LOGGING = {
