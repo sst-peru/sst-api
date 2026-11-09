@@ -46,9 +46,11 @@ class InspectionViewSet(viewsets.ModelViewSet):
     filterset_fields = ("schedule", "status", "schedule__area")
 
     def get_queryset(self):
-        return Inspection.objects.filter(
-            schedule__company=self.request.user.company_id
-        ).select_related("schedule__area")
+        return (
+            Inspection.objects.filter(schedule__company=self.request.user.company_id)
+            .select_related("schedule__area")
+            .prefetch_related("generated_reports")
+        )
 
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
