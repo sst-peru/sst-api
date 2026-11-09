@@ -360,6 +360,25 @@ def test_la_investigacion_pasa_el_accidente_a_en_investigacion(supervisor, opera
     assert response.data["investigation"]["performed_by"] == supervisor.id
 
 
+def test_la_investigacion_registra_las_causas_de_gestion(supervisor, operario):
+    """Inmediatas, básicas y de gestión: la estructura completa del registro oficial."""
+    crear_accidente(operario)
+    accidente = Accident.objects.get()
+
+    response = investigar(
+        supervisor,
+        accidente,
+        immediate_causes="Andamio sin anclaje.",
+        basic_causes="Trabajador sin capacitación en trabajo en altura.",
+        management_causes="No existe procedimiento escrito de trabajo en altura.",
+    )
+
+    assert response.status_code == 200
+    investigacion = response.data["investigation"]
+    assert investigacion["management_causes"].startswith("No existe procedimiento")
+    assert investigacion["basic_causes"].startswith("Trabajador sin capacitación")
+
+
 def test_la_investigacion_exige_causa_raiz(supervisor, operario):
     crear_accidente(operario)
     accidente = Accident.objects.get()

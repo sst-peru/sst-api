@@ -82,7 +82,7 @@ class InvestigationSerializer(serializers.ModelSerializer):
         model = Investigation
         fields = (
             "id", "accident", "method", "method_display", "immediate_causes", "basic_causes",
-            "root_cause", "conclusions", "participants", "performed_by", "performed_by_name",
+            "management_causes", "root_cause", "conclusions", "participants", "performed_by", "performed_by_name",
             "performed_at", "created_at",
         )
         read_only_fields = ("accident", "performed_by", "created_at")

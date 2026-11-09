@@ -189,8 +189,8 @@ class InvestigationMethod(models.TextChoices):
 class Investigation(models.Model):
     """Investigación del accidente. Uno a uno: un accidente se investiga una vez.
 
-    Se separan causas inmediatas, causas básicas y causa raíz porque es la estructura que
-    pide el registro oficial: quedarse en la causa inmediata —«el trabajador se distrajo»—
+    Se separan causas inmediatas, causas básicas, causas de gestión y causa raíz porque es la
+    estructura que pide el registro oficial: quedarse en la causa inmediata —«el trabajador se distrajo»—
     es justo lo que la fiscalización observa.
     """
 
@@ -203,6 +203,9 @@ class Investigation(models.Model):
     )
     immediate_causes = models.TextField("causas inmediatas", blank=True)
     basic_causes = models.TextField("causas básicas", blank=True)
+    # Fallas del propio sistema de gestión: procedimiento inexistente, capacitación no
+    # dada, supervisión ausente. Son las que la empresa puede corregir de raíz.
+    management_causes = models.TextField("causas de gestión", blank=True)
     root_cause = models.TextField("causa raíz")
     conclusions = models.TextField("conclusiones", blank=True)
     participants = models.CharField("participantes", max_length=255, blank=True)
